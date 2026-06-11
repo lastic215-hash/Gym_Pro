@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GYM Pro — نظام إدارة النادي الرياضي</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Tajawal:wght@300;400;500;700;800&display=swap');
+    * { font-family: 'Tajawal', sans-serif; }
+    .font-cyber { font-family: 'Orbitron', sans-serif; }
+    #member-search-input:focus { outline: none; box-shadow: 0 0 0 2px #10b981, 0 0 20px rgba(16,185,129,0.3); }
+    .tab-link.active { background: rgba(16,185,129,0.1); color: #34d399; border-color: rgba(16,185,129,0.3); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    #logs-body tr:last-child { border-bottom: none; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 8px rgba(16,185,129,0.3); } 50% { box-shadow: 0 0 20px rgba(16,185,129,0.6); } }
+    .glow-card { animation: pulse-glow 3s ease-in-out infinite; }
+    input:focus, select:focus { outline: none; box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16,185,129,0.2); }
+
+    @media (max-width: 768px) {
+      #main-app { flex-direction: column; }
+      #main-app > aside { width: 100% !important; height: auto !important; }
+      #main-app > aside nav { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      #main-app > aside nav > .text-xs { display: none; }
+      #main-app > aside nav button { font-size: 12px; padding: 6px 10px; gap: 6px; white-space: nowrap; }
+      #main-app > aside nav button svg { width: 16px; height: 16px; }
+      #main-app > aside > div:first-child { padding: 8px; }
+      #main-app > aside > div:first-child h1 { font-size: 14px; }
+      #main-app > aside > div:first-child p { display: none; }
+      #main-app > aside > .p-3.border-t { padding: 6px; }
+      #main-app > aside > .p-3.border-t button { font-size: 12px; padding: 6px; }
+      #main-app > main { height: auto; }
+      #main-app main > div { padding: 12px !important; }
+      #main-app main .p-5, #main-app main .p-6 { padding: 12px !important; }
+      #main-app main .gap-5 { gap: 10px; }
+      #main-app main .gap-4 { gap: 8px; }
+      div[class*="grid-cols-"] { grid-template-columns: 1fr !important; }
+      div[class*="col-span-"] { grid-column: span 1 / span 1 !important; }
+      .text-3xl { font-size: 1.4rem !important; }
+      .text-2xl { font-size: 1.15rem !important; }
+      .max-w-sm, .max-w-md, .max-w-lg { max-width: calc(100vw - 24px) !important; }
+      main .flex.items-center.justify-between { flex-wrap: wrap; gap: 8px; }
+      #sidebar-clock-btn { margin-top: 4px; }
+      #fin-expense-section .flex.gap-3 { flex-direction: column; }
+      #fin-expense-section .w-36 { width: 100%; }
+      #selected-member-card > div { flex-direction: column; }
+      #selected-member-card button { width: 100%; }
+      #tab-manager-staff .grid-cols-5 > div, #tab-manager-financial .grid-cols-5 > div { padding: 10px !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- ===== Login Screen Overlay ===== -->
+  <div id="login-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center">
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 w-full max-w-sm mx-4 backdrop-blur-sm">
+      <div class="text-center mb-8">
+        <h1 class="font-cyber text-2xl font-bold tracking-wider text-emerald-400">GYM<span class="text-white">PRO</span></h1>
+        <p class="text-slate-500 text-sm mt-1">نظام إدارة النادي الرياضي</p>
+      </div>
+
+      <form id="login-form" autocomplete="off">
+        <div class="mb-4">
+          <label class="block text-sm text-slate-400 mb-1.5">اسم المستخدم</label>
+          <input id="login-username" type="text" placeholder="أدخل اسم المستخدم" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm placeholder-slate-500 transition-all duration-200 text-right">
+        </div>
+        <div class="mb-6 relative">
+          <label class="block text-sm text-slate-400 mb-1.5">كلمة المرور</label>
+          <input id="login-password" type="password" placeholder="أدخل كلمة المرور" class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 transition-all duration-200 text-right">
+          <button type="button" id="toggle-password" class="absolute left-3 top-1/2 mt-[0.55rem] -translate-y-1/2 z-10 text-slate-400 hover:text-slate-200 transition-colors duration-200" title="إظهار/إخفاء كلمة المرور">
+            <svg id="eye-on-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg id="eye-off-icon" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <line x1="2" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
+        <!-- ===== JavaScript for password toggle ===== -->
+        <script>
+          document.getElementById('toggle-password').addEventListener('click', function() {
+            var input = document.getElementById('login-password');
+            var eyeOn = document.getElementById('eye-on-icon');
+            var eyeOff = document.getElementById('eye-off-icon');
+            if (input.type === 'password') {
+              input.type = 'text';
+              eyeOn.classList.add('hidden');
+              eyeOff.classList.remove('hidden');
+            } else {
+              input.type = 'password';
+              eyeOn.classList.remove('hidden');
+              eyeOff.classList.add('hidden');
+            }
+          });
+        </script>
+
+        <div id="login-error" class="mb-4 text-rose-400 text-sm text-center hidden"></div>
+
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-lg transition-colors duration-200 text-sm">تسجيل الدخول</button>
+      </form>
+
+      <div class="mt-6 pt-4 border-t border-slate-800/50">
+        <p class="text-[11px] text-slate-600 text-center leading-relaxed">
+          مدير: ADMIN / admin123<br>
+          استقبال: E102 / emp123<br>
+          مدرب: E101 / emp123
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Main App (hidden until login) ===== -->
+  <div id="main-app" class="hidden min-h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900/70 border-l border-slate-800/50 flex flex-col shrink-0 order-last h-screen">
+      <div class="p-5 border-b border-slate-800/50">
+        <div>
+          <h1 class="font-cyber text-lg font-bold tracking-wider text-emerald-400">GYM<span class="text-slate-100">PRO</span></h1>
+          <p class="text-[10px] text-slate-500 mt-0.5 tracking-wide">نظام إدارة النادي</p>
+        </div>
+      </div>
+
+      <div class="px-3 py-2 border-b border-slate-800/30">
+        <div class="flex items-center gap-2.5 px-2 py-1.5">
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+          <div>
+            <div id="sidebar-user-name" class="text-xs text-slate-200 font-medium"></div>
+            <div id="sidebar-user-role" class="text-[10px] text-slate-500"></div>
+          </div>
+        </div>
+        <button id="sidebar-clock-btn" class="hidden mt-2 w-full px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 bg-emerald-600/20 text-emerald-400 border-emerald-700/40 hover:bg-emerald-600/30">
+          <span id="clock-btn-text">تسجيل الدخول</span>
+        </button>
+      </div>
+
+      <nav class="flex-1 p-3 space-y-0 overflow-y-auto">
+
+        <!-- Manager Zone -->
+        <div id="mgmt-zone-header" data-role="manager" class="text-[10px] font-cyber tracking-widest text-emerald-500/70 px-3 py-3">منطقة المدير</div>
+
+        <button data-tab="manager-dashboard" data-role="manager" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          لوحة التحكم
+        </button>
+
+        <button data-tab="manager-plans" data-role="manager" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          إدارة الباقات
+        </button>
+
+        <button data-tab="manager-staff" data-role="manager" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+          إدارة الموظفين
+        </button>
+
+        <button data-tab="manager-financial" data-role="manager" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          التحليل المالي
+        </button>
+
+        <button data-tab="manager-audit" data-role="manager" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          سجل التدقيقات
+        </button>
+
+        <div data-role="receptionist" class="text-[10px] font-cyber tracking-widest text-blue-500/70 px-3 py-3 mt-2">منطقة الاستقبال</div>
+
+          <button data-tab="employee-scanner" data-role="receptionist" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            البحث عن عضو
+          </button>
+
+        <button data-tab="employee-register" data-role="receptionist" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+          تسجيل عضو جديد
+        </button>
+
+        <button data-tab="employee-members" data-role="receptionist" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          قائمة الأعضاء
+        </button>
+
+        <button data-tab="employee-financial" data-role="receptionist" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          الجرد المالي
+        </button>
+
+        <div data-role="trainer" class="text-[10px] font-cyber tracking-widest text-amber-500/70 px-3 py-3 mt-2">منطقة المدرب</div>
+
+        <button data-tab="trainer-members" data-role="trainer" class="tab-link flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-400 border border-transparent hover:bg-slate-800/40 hover:text-slate-100 transition-all text-sm text-right">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          المتدربون
+        </button>
+
+
+      </nav>
+
+      <div class="p-3 border-t border-slate-800/50 space-y-2">
+        <button id="logout-btn" class="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 hover:text-rose-300 border border-rose-800/30 hover:border-rose-600/50 transition-all text-sm font-semibold">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col p-5 gap-5 overflow-y-auto h-screen">
+
+      <!-- TAB: Manager Dashboard -->
+      <div id="tab-manager-dashboard" data-role="manager" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">لوحة التحكم</h2>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-500" id="dashboard-date"></span>
+            <button id="export-report-btn" class="text-xs font-semibold text-emerald-400 border border-emerald-700/50 hover:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors duration-200 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              تصدير التقارير المالية
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-3 gap-4 mt-4" id="stats-grid">
+          <div class="bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-800/40 rounded-xl p-5 glow-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-emerald-400/80">الدخل الشهري</span>
+              <span class="text-emerald-400 text-lg">💰</span>
+            </div>
+            <div class="text-3xl font-bold text-emerald-300" id="stat-income">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">دينار ليبي</div>
+          </div>
+          <div class="bg-gradient-to-br from-blue-950/60 to-slate-900/80 border border-blue-800/40 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-blue-400/80">الأعضاء النشطون</span>
+              <span class="text-blue-400 text-lg">💪</span>
+            </div>
+            <div class="text-3xl font-bold text-blue-300" id="stat-active">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">عضوية سارية</div>
+          </div>
+          <div class="bg-gradient-to-br from-rose-950/60 to-slate-900/80 border border-rose-800/40 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-rose-400/80">الاشتراكات المنتهية</span>
+              <span class="text-rose-400 text-lg">⚠️</span>
+            </div>
+            <div class="text-3xl font-bold text-rose-300" id="stat-expired">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">بحاجة للتجديد</div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 overflow-hidden">
+            <h3 class="font-cyber text-xs tracking-widest text-cyan-400 mb-4">تحليل أوقات الذروة</h3>
+            <div class="relative h-72 w-full"><canvas id="peakHoursChart"></canvas></div>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 overflow-hidden">
+            <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">توزيع الإيرادات حسب النشاط</h3>
+            <div class="relative h-72 w-full"><canvas id="revenueSpreadChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Staff Table -->
+        <div class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <h3 class="font-cyber text-xs tracking-widest text-slate-400 mb-3">الموظفون النشطون اليوم</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">الرمز</th>
+                  <th class="py-3 px-4 font-medium text-right">الاسم</th>
+                  <th class="py-3 px-4 font-medium text-right">المسمى</th>
+                  <th class="py-3 px-4 font-medium text-right">التخصص</th>
+                  <th class="py-3 px-4 font-medium text-right">الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="staff-tbody">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="5">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+
+      </div>
+
+      <!-- TAB: Manager Plans -->
+      <div id="tab-manager-plans" data-role="manager" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">إدارة باقات الجيم</h2>
+        </div>
+
+        <div class="grid grid-cols-5 gap-4 mt-4">
+          <div class="col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-xl p-6">
+            <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">إضافة باقة جديدة</h3>
+            <form id="plan-form" class="space-y-4" autocomplete="off">
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">اسم الباقة</label>
+                
+                <input id="plan-name" type="text" placeholder="مثال: باقة اللياقة العامة" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">المدة (أيام)</label>
+                <input id="plan-duration" type="number" min="1" placeholder="30" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">السعر (د.ل)</label>
+                <input id="plan-price" type="number" step="0.01" min="0" placeholder="150.00" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <input id="plan-edit-id" type="hidden" value="">
+              <div class="flex gap-2">
+                <button type="submit" id="plan-save-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm flex-1">إضافة الباقة</button>
+                <button type="button" id="plan-cancel-btn" class="hidden bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold px-4 py-2.5 rounded-lg transition-colors duration-200 text-sm">إلغاء</button>
+              </div>
+            </form>
+            <div id="plan-result" class="mt-4 hidden"></div>
+          </div>
+
+          <div class="col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-xl p-5">
+            <h3 class="font-cyber text-xs tracking-widest text-slate-400 mb-3">جميع الباقات</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-slate-500 border-b border-slate-800/50">
+                    <th class="py-3 px-4 font-medium text-right">#</th>
+                    <th class="py-3 px-4 font-medium text-right">اسم الباقة</th>
+                    <th class="py-3 px-4 font-medium text-right">المدة</th>
+                    <th class="py-3 px-4 font-medium text-right">السعر</th>
+                    <th class="py-3 px-4 font-medium text-right">الحالة</th>
+                    <th class="py-3 px-4 font-medium text-right">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="plans-tbody">
+                  <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="7">جاري التحميل...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Manager Staff Management -->
+      <div id="tab-manager-staff" data-role="manager" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">إدارة الموظفين</h2>
+        </div>
+
+        <div class="grid grid-cols-5 gap-4 mt-4">
+          <div class="col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-xl p-6">
+            <h3 id="staff-form-title" class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">إضافة موظف جديد</h3>
+            <form id="staff-form" class="space-y-4" autocomplete="off">
+              <input id="staff-edit-id" type="hidden" value="">
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">الاسم الكامل</label>
+                <input id="staff-name" type="text" placeholder="مثال: أحمد محمد" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">رقم الهاتف</label>
+                <input id="staff-phone" type="text" placeholder="مثال: 0912345678" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">المسمى الوظيفي</label>
+                <select id="staff-role" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right appearance-none cursor-pointer">
+                  <option value="">-- اختر المسمى --</option>
+                  <option value="مدرب">مدرب</option>
+                  <option value="موظف استقبال">موظف استقبال</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">التخصص (للمدربين)</label>
+                <select id="staff-specialization" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right appearance-none cursor-pointer">
+                  <option value="">-- بدون تخصص --</option>
+                  <option value="Weightlifting">رفع أثقال (Weightlifting)</option>
+                  <option value="Calisthenics">تمارين سويدي (Calisthenics)</option>
+                  <option value="MMA">فنون القتال (MMA)</option>
+                  <option value="General">لياقة عامة</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm text-slate-400 mb-1.5">بداية الدوام</label>
+                  <input id="staff-work-start" type="time" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200">
+                </div>
+                <div>
+                  <label class="block text-sm text-slate-400 mb-1.5">نهاية الدوام</label>
+                  <input id="staff-work-end" type="time" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">كلمة المرور</label>
+                <input id="staff-password" type="password" placeholder="أدخل كلمة مرور للموظف" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div class="flex gap-2">
+                <button type="submit" id="staff-submit-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm flex-1">إضافة الموظف</button>
+                <button type="button" id="staff-cancel-btn" class="hidden bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold px-4 py-2.5 rounded-lg transition-colors duration-200 text-sm">إلغاء</button>
+              </div>
+            </form>
+            <div id="staff-result" class="mt-4 hidden"></div>
+          </div>
+
+          <div class="col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-xl p-5">
+            <h3 class="font-cyber text-xs tracking-widest text-slate-400 mb-3">جميع الموظفين</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-slate-500 border-b border-slate-800/50">
+                    <th class="py-3 px-4 font-medium text-right">الرمز</th>
+                    <th class="py-3 px-4 font-medium text-right">الاسم</th>
+                    <th class="py-3 px-4 font-medium text-right">الهاتف</th>
+                    <th class="py-3 px-4 font-medium text-right">المسمى</th>
+                    <th class="py-3 px-4 font-medium text-right">التخصص</th>
+                    <th class="py-3 px-4 font-medium text-right">الدوام</th>
+                    <th class="py-3 px-4 font-medium text-right">حالة الدوام</th>
+                    <th class="py-3 px-4 font-medium text-right">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="staff-management-tbody">
+                  <tr>
+                    <td class="py-8 px-4 text-center text-slate-600" colspan="8">جاري التحميل...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Manager Financial Intelligence -->
+      <div id="tab-manager-financial" data-role="manager" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">التحليل المالي</h2>
+          <span id="financial-period" class="text-xs text-slate-500"></span>
+        </div>
+
+        <!-- KPI Cards Row -->
+        <div class="grid grid-cols-3 gap-4 mt-4" id="financial-kpi-grid">
+          <div class="bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-800/40 rounded-xl p-5 glow-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-emerald-400/80">إجمالي الإيرادات</span>
+              <span class="text-emerald-400 text-lg">📈</span>
+            </div>
+            <div class="text-3xl font-bold text-emerald-300" id="fin-revenue">0.00</div>
+            <div class="text-[11px] text-slate-500 mt-1">دينار ليبي</div>
+          </div>
+          <div class="bg-gradient-to-br from-rose-950/60 to-slate-900/80 border border-rose-800/40 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-rose-400/80">إجمالي المصروفات</span>
+              <span class="text-rose-400 text-lg">📉</span>
+            </div>
+            <div class="text-3xl font-bold text-rose-300" id="fin-expenses">0.00</div>
+            <div class="text-[11px] text-slate-500 mt-1">دينار ليبي</div>
+          </div>
+          <div class="bg-gradient-to-br from-slate-900/80 to-slate-900/80 border rounded-xl p-5 transition-all duration-500" id="fin-profit-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-cyber tracking-widest text-slate-400/80" id="fin-profit-label">صافي الأرباح</span>
+              <span class="text-lg" id="fin-profit-icon">💰</span>
+            </div>
+            <div class="text-3xl font-bold" id="fin-profit">0.00</div>
+            <div class="text-[11px] text-slate-500 mt-1" id="fin-profit-sub">دينار ليبي</div>
+          </div>
+        </div>
+
+        <!-- Two-Column Hub: Chart + Quick Add -->
+        <div class="grid grid-cols-5 gap-4 mt-4">
+          <div class="col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-6 overflow-hidden">
+            <h3 class="font-cyber text-xs tracking-widest text-cyan-400 mb-4">اتجاه الإيرادات vs المصروفات (آخر 6 أشهر)</h3>
+            <div class="relative h-80 w-full"><canvas id="financialTrendChart"></canvas></div>
+          </div>
+          <div class="col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-xl p-5">
+            <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">تسجيل مصروف جديد</h3>
+            <form id="expense-form" class="space-y-4" autocomplete="off">
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">الوصف</label>
+                <input id="exp-desc" type="text" placeholderمثال: فاتورة كهرباء" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">الفئة</label>
+                <select id="exp-category" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right appearance-none cursor-pointer">
+                  <option value="Rent">إيجار</option>
+                  <option value="Utilities">مرافق</option>
+                  <option value="Salaries">رواتب</option>
+                  <option value="Marketing">تسويق</option>
+                  <option value="Equipment">معدات</option>
+                  <option value="Other">أخرى</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">المبلغ (د.ل)</label>
+                <input id="exp-amount" type="number" step="0.01" min="0" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">التاريخ</label>
+                <input id="exp-date" type="date" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right">
+              </div>
+              <button type="submit" id="expense-submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-lg transition-colors duration-200 text-sm">حفظ المعاملة</button>
+            </form>
+            <div id="expense-result" class="mt-3 hidden"></div>
+          </div>
+        </div>
+
+        <!-- Transactions Ledger -->
+        <div class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-cyber text-xs tracking-widest text-slate-400">سجل المصروفات</h3>
+            <span class="text-[11px] text-slate-600" id="expenses-count">آخر 50 عملية</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="expenses-table">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">#</th>
+                  <th class="py-3 px-4 font-medium text-right">الوصف</th>
+                  <th class="py-3 px-4 font-medium text-right">الفئة</th>
+                  <th class="py-3 px-4 font-medium text-right">المبلغ</th>
+                  <th class="py-3 px-4 font-medium text-right">التاريخ</th>
+                  <th class="py-3 px-4 font-medium text-right">المسجل</th>
+                  <th class="py-3 px-4 font-medium text-right">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-tbody">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="7">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Manager Audit Logs -->
+      <div id="tab-manager-audit" data-role="manager" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">سجل التدقيقات الأمنية</h2>
+          <button id="refresh-audit-btn" class="text-xs text-slate-500 hover:text-emerald-400 transition-colors bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">تحديث ↻</button>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <div class="flex flex-wrap items-end gap-3 mb-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800/30">
+            <div class="flex-1 min-w-[140px]">
+              <label class="block text-[10px] text-slate-500 mb-1 font-cyber tracking-wider">بحث في الإجراء</label>
+              <input id="audit-filter-search" type="text" placeholder="كلمة مفتاحية..." class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-600 transition-all duration-200 text-right">
+            </div>
+            <div class="w-[130px]">
+              <label class="block text-[10px] text-slate-500 mb-1 font-cyber tracking-wider">الدور</label>
+              <select id="audit-filter-role" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-100 transition-all duration-200 text-right appearance-none cursor-pointer">
+                <option value="">الكل</option>
+                <option value="manager">مدير</option>
+                <option value="receptionist">موظف</option>
+                <option value="trainer">مدرب</option>
+              </select>
+            </div>
+            <div class="flex-1 min-w-[120px]">
+              <label class="block text-[10px] text-slate-500 mb-1 font-cyber tracking-wider">المستخدم</label>
+              <input id="audit-filter-user" type="text" placeholder="اسم المستخدم..." class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-600 transition-all duration-200 text-right">
+            </div>
+            <div class="w-[140px]">
+              <label class="block text-[10px] text-slate-500 mb-1 font-cyber tracking-wider">من تاريخ</label>
+              <input id="audit-filter-from" type="date" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-100 transition-all duration-200">
+            </div>
+            <div class="w-[140px]">
+              <label class="block text-[10px] text-slate-500 mb-1 font-cyber tracking-wider">إلى تاريخ</label>
+              <input id="audit-filter-to" type="date" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-100 transition-all duration-200">
+            </div>
+            <div class="flex gap-2 pb-px">
+              <button id="audit-filter-apply" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-200 text-xs flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                بحث
+              </button>
+              <button id="audit-filter-reset" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold px-3 py-2 rounded-lg transition-colors duration-200 text-xs">إعادة تعيين</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">الوقت</th>
+                  <th class="py-3 px-4 font-medium text-right">الهوية</th>
+                  <th class="py-3 px-4 font-medium text-right">الإجراء</th>
+                </tr>
+              </thead>
+              <tbody id="audit-logs-tbody" class="font-mono text-sm text-cyan-400">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="3">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="audit-count" class="mt-3 text-[11px] text-slate-600 text-left"></div>
+        </div>
+      </div>
+
+      <!-- TAB: Employee Smart Search -->
+      <div id="tab-employee-scanner" data-role="receptionist" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">البحث عن عضو</h2>
+        </div>
+
+        <section class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <div class="relative">
+            <input id="member-search-input" type="text" autofocus placeholder="ابحث بالاسم أو رقم الهاتف ..." class="w-full bg-slate-900 border-2 border-emerald-500/40 rounded-lg px-5 py-3 text-slate-100 text-base placeholder-slate-600 transition-all duration-300 ease-in-out text-right">
+            <div id="search-spinner" class="absolute left-3 top-1/2 -translate-y-1/2 hidden">
+              <svg class="animate-spin h-5 w-5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            </div>
+          </div>
+        </section>
+
+        <section class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-cyber text-xs tracking-widest text-slate-400">نتائج البحث</h3>
+            <span id="search-count" class="text-[11px] text-slate-600"></span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">الاسم</th>
+                  <th class="py-3 px-4 font-medium text-right">رقم الهاتف</th>
+                  <th class="py-3 px-4 font-medium text-right">الحالة</th>
+                  <th class="py-3 px-4 font-medium text-right">تاريخ الانتهاء</th>
+                  <th class="py-3 px-4 font-medium text-right">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="search-results-body">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="5">ابدأ بكتابة الاسم أو رقم الهاتف للبحث</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="selected-member-card" class="hidden p-5 rounded-xl border-2 bg-slate-900 border-slate-800 transition-all duration-300 ease-in-out">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 id="selected-member-name" class="text-lg font-semibold text-slate-100"></h3>
+              <p id="selected-member-details" class="text-sm text-slate-500 mt-1"></p>
+            </div>
+            <button id="confirm-entry-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm">تأكيد الدخول</button>
+          </div>
+        </section>
+
+     
+        <section class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 flex-1">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-cyber text-xs tracking-widest text-slate-400">آخر عمليات الدخول</h3>
+            <span class="text-[11px] text-slate-600">آخر 5 عمليات</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">رقم العضوية</th>
+                  <th class="py-3 px-4 font-medium text-right">الاسم</th>
+                  <th class="py-3 px-4 font-medium text-right">الوقت</th>
+                  <th class="py-3 px-4 font-medium text-right">الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="logs-body">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="4">لا توجد عمليات دخول مسجلة بعد</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- TAB: Employee Register -->
+      <div id="tab-employee-register" data-role="receptionist" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">تسجيل عضو جديد</h2>
+        </div>
+        <section class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-6 mt-4">
+          <form id="register-form" class="space-y-5" autocomplete="off">
+            <div>
+              <label class="block text-sm text-slate-400 mb-1.5">الاسم الكامل</label>
+              <input id="reg-name" type="text" placeholder="أدخل اسم العضو" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1.5">رقم الهاتف</label>
+              <input id="reg-phone" type="text" placeholder="أدخل رقم الهاتف" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1.5">اختر الباقة</label>
+              <select id="reg-plan-id" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right appearance-none cursor-pointer">
+                <option value="" disabled selected>-- جاري تحميل الباقات --</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-slate-400 mb-1.5">المدرب (اختياري)</label>
+              <select id="reg-trainer-id" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right appearance-none cursor-pointer">
+                <option value="">-- بدون مدرب --</option>
+              </select>
+            </div>
+            <div id="reg-payment-section" class="border-t border-slate-700/40 pt-5 hidden">
+              <h3 class="text-sm font-semibold text-emerald-400 mb-4">الدفع</h3>
+              <div class="flex items-center justify-between bg-slate-800/30 rounded-lg px-4 py-3 mb-4">
+                <span class="text-sm text-slate-400">مبلغ الباقة</span>
+                <span id="reg-plan-price" class="text-lg font-bold text-emerald-300"></span>
+              </div>
+              <div class="flex gap-4 mb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="reg-payment-method" value="cash" checked class="accent-emerald-500">
+                  <span class="text-sm text-slate-300">نقداً</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="reg-payment-method" value="card" class="accent-emerald-500">
+                  <span class="text-sm text-slate-300">بطاقة</span>
+                </label>
+              </div>
+              <div id="reg-cash-fields">
+                <label class="block text-sm text-slate-400 mb-1.5">المبلغ المستلم</label>
+                <input id="reg-amount-received" type="number" min="0" step="0.01" placeholder="المبلغ المستلم" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right mb-3">
+                <div id="reg-change-display" class="hidden flex items-center justify-between bg-amber-950/40 border border-amber-700/30 rounded-lg px-4 py-3">
+                  <span class="text-sm text-amber-300">الباقي</span>
+                  <span id="reg-change-amount" class="text-lg font-bold text-amber-200"></span>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm w-full">تسجيل العضو وتسجيل الدفع</button>
+          </form>
+          <div id="reg-result" class="mt-4 hidden"></div>
+        </section>
+      </div>
+
+      <!-- TAB: Employee Financial Inventory -->
+      <div id="tab-employee-financial" data-role="receptionist" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-amber-400">الجرد المالي والإيداع في الخزينة</h2>
+          <div class="flex bg-slate-800/60 rounded-lg p-0.5" id="fin-period-toggle">
+            <button data-period="daily" class="px-3 py-1.5 text-xs font-semibold rounded-md bg-emerald-600 text-white transition-all">يومي</button>
+            <button data-period="monthly" class="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-slate-200 transition-all">شهري</button>
+          </div>
+        </div>
+        <div id="financial-error" class="hidden mt-2 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm"></div>
+        <div id="financial-success" class="hidden mt-2 p-3 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-200 text-sm"></div>
+
+        <!-- Daily View -->
+        <div id="fin-daily-view">
+          <div class="grid grid-cols-4 gap-3 mt-4">
+            <div class="bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-800/40 rounded-xl p-4">
+              <div class="text-xs text-emerald-400/80 mb-1">مقبوضات نقدية</div>
+              <div class="text-2xl font-bold text-emerald-300" id="fin-cash-total">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-950/60 to-slate-900/80 border border-blue-800/40 rounded-xl p-4">
+              <div class="text-xs text-blue-400/80 mb-1">مقبوضات بطاقة</div>
+              <div class="text-2xl font-bold text-blue-300" id="fin-card-total">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-rose-950/60 to-slate-900/80 border border-rose-800/40 rounded-xl p-4">
+              <div class="text-xs text-rose-400/80 mb-1">مصروفات اليوم</div>
+              <div class="text-2xl font-bold text-rose-300" id="fin-expenses-total">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-amber-950/60 to-slate-900/80 border border-amber-800/40 rounded-xl p-4">
+              <div class="text-xs text-amber-400/80 mb-1">صافي النقدية المتوقعة</div>
+              <div class="text-2xl font-bold text-amber-300" id="fin-net-cash">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+          </div>
+
+          <!-- Expense Recording -->
+          <div id="fin-expense-section" class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-6 mt-4">
+            <h3 class="text-sm font-semibold text-rose-400 mb-4">تسجيل مصروف (يخصم من الدرج)</h3>
+            <div class="flex gap-3 items-end">
+              <div class="flex-1">
+                <label class="block text-sm text-slate-400 mb-1.5">الوصف</label>
+                <input id="fin-expense-desc" type="text" placeholder="مثلاً: مياه، قرطاسية..." class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div class="w-36">
+                <label class="block text-sm text-slate-400 mb-1.5">المبلغ</label>
+                <input id="fin-expense-amount" type="number" min="0" step="0.01" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <button id="fin-expense-btn" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors duration-200 text-sm whitespace-nowrap">تسجيل</button>
+            </div>
+            <div id="fin-expense-msg" class="mt-3 hidden text-xs"></div>
+          </div>
+
+          <!-- Reconciliation & Deposit -->
+          <div id="fin-reconciliation-section" class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-6 mt-4">
+            <h3 class="text-sm font-semibold text-emerald-400 mb-4">تسوية الجرد اليومي</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm text-slate-400 mb-1.5">المبلغ النقدي الفعلي في الدرج</label>
+                <input id="fin-actual-cash" type="number" min="0" step="0.01" placeholder="أدخل المبلغ النقدي الفعلي" class="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+              </div>
+              <div id="fin-discrepancy-display" class="hidden flex items-center justify-between rounded-lg px-4 py-3">
+                <span class="text-sm">الفارق</span>
+                <span id="fin-discrepancy-amount" class="text-lg font-bold"></span>
+              </div>
+              <button id="fin-deposit-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm w-full">إيداع في الخزينة</button>
+            </div>
+          </div>
+
+          <!-- Already Deposited Message -->
+          <div id="fin-deposited-msg" class="hidden bg-slate-900/40 border border-emerald-800/40 rounded-xl p-6 mt-4 text-center">
+            <svg class="w-12 h-12 mx-auto text-emerald-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-emerald-200 text-sm">تم إيداع الخزينة اليوم</p>
+            <p class="text-slate-400 text-xs mt-1">المبلغ: <span id="fin-deposited-amount" class="text-emerald-300 font-bold"></span></p>
+          </div>
+        </div>
+
+        <!-- Monthly View -->
+        <div id="fin-monthly-view" class="hidden mt-4">
+          <div class="flex items-center gap-2 mb-4">
+            <select id="fin-month-year" class="bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-100 text-sm text-right">
+            </select>
+            <select id="fin-month-month" class="bg-slate-900 border border-slate-700/60 rounded-lg px-3 py-2 text-slate-100 text-sm text-right">
+              <option value="1">يناير</option><option value="2">فبراير</option><option value="3">مارس</option>
+              <option value="4">أبريل</option><option value="5">مايو</option><option value="6">يونيو</option>
+              <option value="7">يوليو</option><option value="8">أغسطس</option><option value="9">سبتمبر</option>
+              <option value="10">أكتوبر</option><option value="11">نوفمبر</option><option value="12">ديسمبر</option>
+            </select>
+            <button id="fin-monthly-refresh" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm transition-colors">عرض</button>
+          </div>
+          <div class="grid grid-cols-5 gap-3">
+            <div class="bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-800/40 rounded-xl p-4">
+              <div class="text-xs text-emerald-400/80 mb-1">إجمالي النقدي</div>
+              <div class="text-2xl font-bold text-emerald-300" id="fin-monthly-cash">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-950/60 to-slate-900/80 border border-blue-800/40 rounded-xl p-4">
+              <div class="text-xs text-blue-400/80 mb-1">إجمالي البطاقة</div>
+              <div class="text-2xl font-bold text-blue-300" id="fin-monthly-card">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-rose-950/60 to-slate-900/80 border border-rose-800/40 rounded-xl p-4">
+              <div class="text-xs text-rose-400/80 mb-1">إجمالي المصروفات</div>
+              <div class="text-2xl font-bold text-rose-300" id="fin-monthly-expenses">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-amber-950/60 to-slate-900/80 border border-amber-800/40 rounded-xl p-4">
+              <div class="text-xs text-amber-400/80 mb-1">صافي النقدية</div>
+              <div class="text-2xl font-bold text-amber-300" id="fin-monthly-net">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+            <div class="bg-gradient-to-br from-violet-950/60 to-slate-900/80 border border-violet-800/40 rounded-xl p-4">
+              <div class="text-xs text-violet-400/80 mb-1">إجمالي الإيداعات</div>
+              <div class="text-2xl font-bold text-violet-300" id="fin-monthly-deposits">0</div>
+              <div class="text-[10px] text-slate-500">د.ل</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Trainer Members Dashboard -->
+      <div id="tab-trainer-members" data-role="trainer" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-amber-400">لوحة المدرب</h2>
+          <div class="flex items-center gap-2">
+            <span id="trainer-members-count" class="text-xs text-slate-500 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40"></span>
+            <button id="refresh-trainer-btn" class="text-xs text-slate-500 hover:text-amber-400 transition-colors bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">تحديث ↻</button>
+          </div>
+        </div>
+
+        <!-- Trainer KPI Cards -->
+        <div class="grid grid-cols-4 gap-3 mt-4" id="trainer-kpi-grid">
+          <div class="bg-gradient-to-br from-amber-950/60 to-slate-900/80 border border-amber-800/40 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-cyber tracking-widest text-amber-400/80">إجمالي المتدربين</span>
+              <span class="text-amber-400 text-lg">👥</span>
+            </div>
+            <div class="text-3xl font-bold text-amber-300" id="trainer-kpi-total">0</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">متدرب مسجل</div>
+          </div>
+          <div class="bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-800/40 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-cyber tracking-widest text-emerald-400/80">حضور اليوم</span>
+              <span class="text-emerald-400 text-lg">✅</span>
+            </div>
+            <div class="text-3xl font-bold text-emerald-300" id="trainer-kpi-today">0</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">متدرب حضر اليوم</div>
+          </div>
+          <div class="bg-gradient-to-br from-sky-950/60 to-slate-900/80 border border-sky-800/40 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-cyber tracking-widest text-sky-400/80">نسبة الحضور</span>
+              <span class="text-sky-400 text-lg">📊</span>
+            </div>
+            <div class="text-3xl font-bold text-sky-300" id="trainer-kpi-rate">0%</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">من إجمالي المتدربين</div>
+          </div>
+          <div class="bg-gradient-to-br from-violet-950/60 to-slate-900/80 border border-violet-800/40 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-cyber tracking-widest text-violet-400/80">النشطون</span>
+              <span class="text-violet-400 text-lg">💪</span>
+            </div>
+            <div class="text-3xl font-bold text-violet-300" id="trainer-kpi-active">0</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">عضوية سارية</div>
+          </div>
+        </div>
+
+        <div id="trainer-members-error" class="hidden mt-2 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm"></div>
+
+        <!-- Members Table -->
+        <div class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <h3 class="font-cyber text-xs tracking-widest text-amber-400 mb-3">قائمة المتدربين</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">#</th>
+                  <th class="py-3 px-4 font-medium text-right">الاسم</th>
+                  <th class="py-3 px-4 font-medium text-right">الهاتف</th>
+                  <th class="py-3 px-4 font-medium text-right">الباقة</th>
+                  <th class="py-3 px-4 font-medium text-right">تاريخ الاشتراك</th>
+                  <th class="py-3 px-4 font-medium text-right">تاريخ الإنتهاء</th>
+                  <th class="py-3 px-4 font-medium text-right">الحالة</th>
+                  <th class="py-3 px-4 font-medium text-right">الحضور</th>
+                </tr>
+              </thead>
+              <tbody id="trainer-members-tbody">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="8">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Today's Attendance Log -->
+        <div class="bg-slate-900/40 border border-slate-800/50 rounded-xl p-5 mt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-cyber text-xs tracking-widest text-emerald-400">سجل حضور اليوم</h3>
+            <span id="trainer-today-count" class="text-[11px] text-slate-500">لا يوجد حضور</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">#</th>
+                  <th class="py-3 px-4 font-medium text-right">العضو</th>
+                  <th class="py-3 px-4 font-medium text-right">الوقت</th>
+                </tr>
+              </thead>
+              <tbody id="trainer-today-tbody">
+                <tr>
+                  <td class="py-6 px-4 text-center text-slate-600" colspan="3">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attendance History Modal -->
+      <div id="attendance-history-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center">
+        <div class="bg-slate-900 border border-slate-700/60 rounded-xl p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-cyber text-xs tracking-widest text-amber-400">سجل حضور المتدرب</h3>
+            <span id="history-member-label" class="text-sm text-slate-300"></span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-slate-500 border-b border-slate-800/50">
+                  <th class="py-3 px-4 font-medium text-right">التاريخ</th>
+                  <th class="py-3 px-4 font-medium text-right">الوقت</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <tr>
+                  <td class="py-8 px-4 text-center text-slate-600" colspan="2">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 flex justify-end">
+            <button id="history-close-btn" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold px-4 py-2 rounded-lg transition-colors duration-200 text-sm">إغلاق</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Employee Members -->
+      <div id="tab-employee-members" data-role="receptionist" class="tab-panel">
+        <div class="flex items-center justify-between mb-1">
+          <h2 class="font-cyber text-lg tracking-wider text-emerald-400">قائمة الأعضاء</h2>
+          <div class="flex gap-2">
+            <button id="show-members-all-btn" class="text-xs text-emerald-400 border border-emerald-700/50 hover:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors">الكل</button>
+            <button id="show-members-by-plan-btn" class="text-xs text-slate-500 border border-slate-700/50 hover:bg-slate-800/40 px-3 py-1.5 rounded-lg transition-colors">حسب الباقة</button>
+            <button id="refresh-members-btn" class="text-xs text-slate-500 hover:text-emerald-400 transition-colors bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">تحديث ↻</button>
+          </div>
+        </div>
+        <div id="members-error" class="hidden mt-2 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm"></div>
+
+        <!-- Default: All members view -->
+        <div id="members-all-view">
+          <div class="grid grid-cols-2 gap-4 mt-4 flex-1">
+            <div class="bg-slate-900/40 border border-emerald-800/30 rounded-xl p-5">
+              <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-3 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                الأعضاء النشطون
+              </h3>
+              <div class="overflow-y-auto max-h-[480px] space-y-2" id="active-members-list">
+                <p class="text-slate-600 text-sm py-4 text-center">جاري التحميل...</p>
+              </div>
+            </div>
+            <div class="bg-slate-900/40 border border-rose-800/30 rounded-xl p-5">
+              <h3 class="font-cyber text-xs tracking-widest text-rose-400 mb-3 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                الأعضاء المنتهية اشتراكاتهم
+              </h3>
+              <div class="overflow-y-auto max-h-[480px] space-y-2" id="expired-members-list">
+                <p class="text-slate-600 text-sm py-4 text-center">جاري التحميل...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- By-plan classification view -->
+        <div id="members-by-plan-view" class="hidden">
+          <div id="members-by-plan-container" class="mt-4 grid grid-cols-1 gap-4"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Payment Checkout Modal -->
+  <div id="payment-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-700/60 rounded-xl p-6 w-full max-w-md mx-4">
+      <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">معالجة الدفع وتفعيل الاشتراك</h3>
+      <div id="payment-member-info" class="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 mb-4 text-sm">
+        <div class="text-slate-300" id="payment-member-label"></div>
+      </div>
+      <form id="payment-form" class="space-y-4" autocomplete="off">
+        <input id="payment-member-id" type="hidden">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">اختر الباقة</label>
+          <select id="payment-plan-id" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 appearance-none cursor-pointer">
+            <option value="" disabled selected>-- جاري تحميل الباقات --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">المبلغ (د.ل)</label>
+          <input id="payment-amount" type="number" step="0.01" min="0" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200 text-right" readonly>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">طريقة الدفع</label>
+          <div class="flex gap-4 mt-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="payment-method" value="cash" checked class="accent-emerald-500">
+              <span class="text-sm text-slate-300">نقداً</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="payment-method" value="card" class="accent-emerald-500">
+              <span class="text-sm text-slate-300">بطاقة</span>
+            </label>
+          </div>
+        </div>
+        <div id="payment-summary" class="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 text-sm space-y-1">
+          <div class="flex justify-between"><span class="text-slate-500">الباقة:</span><span id="summary-plan" class="text-slate-300">—</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">المدة:</span><span id="summary-duration" class="text-slate-300">—</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">المبلغ:</span><span id="summary-amount" class="text-emerald-400 font-semibold">—</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">تاريخ الانتهاء الجديد:</span><span id="summary-expiry" class="text-slate-300">—</span></div>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" id="payment-submit-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm flex-1">تأكيد الدفع</button>
+          <button type="button" id="payment-cancel-btn" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold px-4 py-2.5 rounded-lg transition-colors duration-200 text-sm">إلغاء</button>
+        </div>
+      </form>
+      <div id="payment-result" class="mt-3 hidden"></div>
+      <div id="payment-success-anim" class="hidden fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+        <div class="bg-emerald-600/90 rounded-full p-8 animate-bounce shadow-2xl shadow-emerald-500/50">
+          <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Member Modal -->
+  <div id="edit-member-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-700/60 rounded-xl p-6 w-full max-w-md mx-4">
+      <h3 class="font-cyber text-xs tracking-widest text-emerald-400 mb-4">تعديل بيانات العضو</h3>
+      <form id="edit-member-form" class="space-y-4" autocomplete="off">
+        <input id="edit-member-id" type="hidden">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">الاسم الكامل</label>
+          <input id="edit-member-name" type="text" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">رقم الهاتف</label>
+          <input id="edit-member-phone" type="text" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm placeholder-slate-600 transition-all duration-200 text-right">
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">الباقة</label>
+          <select id="edit-member-plan-id" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200"></select>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1.5">المدرب (اختياري)</label>
+          <select id="edit-member-trainer-id" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-4 py-2.5 text-slate-100 text-sm transition-all duration-200"></select>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors duration-200 text-sm flex-1">حفظ التعديلات</button>
+          <button type="button" id="edit-member-cancel" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold px-4 py-2.5 rounded-lg transition-colors duration-200 text-sm">إلغاء</button>
+        </div>
+      </form>
+      <div id="edit-member-result" class="mt-3 hidden"></div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

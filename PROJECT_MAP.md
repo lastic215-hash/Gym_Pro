@@ -1,0 +1,81 @@
+# GYM Pro — External Memory Index
+
+| File | Size | Content |
+|------|------|---------|
+| [MAP_STACK.md](MAP_STACK.md) | 0.5KB | Electron 42 + Express 5 + MySQL2 + Tailwind CDN |
+| [MAP_FLOW.md](MAP_FLOW.md) | 1.0KB | fork→server→DB init; 3-role routing; schema (7 tables) |
+| [MAP_ORPHANS.md](MAP_ORPHANS.md) | 0.8KB | 13 pending: auth leak, no tests, race conditions, CDN deps |
+| [MAP_GOALS.md](MAP_GOALS.md) | 0.7KB | 4 milestones with verifiable checkboxes |
+
+## Last Session (2026-06-09) — Employee Clock-In System (replaces vacation toggle)
+**Feature**: Removed manager-driven "إجازة/مناوب" toggle (`works_today`). Replaced with self clock-in system for all employees. New DB columns `is_clocked_in`, `last_clock_in`. Endpoint `POST /api/employee/clock-in` sets `is_clocked_in = 1` (one-way). Sidebar clock-in button for non-manager roles only (hidden for admin). Upon successful clock-in, button shows "تم الدخول" and disables (no clock-out toggle). Manager staff tab shows active status with check-in time. Dashboard shows "نشط" with time for clocked-in employees.
+
+**Refinements**:
+- Removed `data-role` from clock button to fix `applyRoleVisibility` hiding it for all roles — visibility now managed solely by `updateClockBtn()` (hidden if `role === 'manager'`).
+- Professional toggle: Green "تسجيل الدخول" ↔ Red "تسجيل الخروج" (both clickable).
+- Optimistic UI — button toggles immediately on click, syncs with server in background (5s timeout, reverts on error).
+- Manager staff table badges: 🟢 نشط (green) / 🔴 غير نشط (red).
+
+## Current Session (2026-06-11) — Enhanced Trainer Dashboard
+**Feature**: Transformed the basic trainer members table into a full trainer dashboard with KPI cards, today's attendance log, and per-member attendance history.
+
+**Backend**: Two new endpoints in `memberController.js`:
+- `GET /api/employee/attendance/today/:trainerId` — returns today's attendance records for the trainer with member names and timestamps (`memberController.js:397-412`)
+- `GET /api/employee/attendance/history/:memberId/:trainerId` — returns full attendance history (last 50 records) for a specific member with this trainer (`memberController.js:414-432`)
+Routes registered in `routes/members.js:39-40`.
+
+**Frontend — index.html**:
+- 4 animated KPI cards at the top of the trainer tab: إجمالي المتدربين (total), حضور اليوم (today's attendance), نسبة الحضور (attendance rate %), النشطون (active count) — each with gradient backgrounds and icons (`index.html:837-875`)
+- Today's attendance log section below the members table with member name and time columns (`index.html:913-937`)
+- Attendance history modal (`#attendance-history-modal`) that appears when clicking the "✔ حاضر" badge on any member — shows full date/time log (`index.html:940-961`)
+
+**Frontend — renderer.js**:
+- `initTrainerDashboard()` orchestrates both `loadTrainerMembers()` and `loadTrainerAttendanceToday()` (`renderer.js:1912-1915`)
+- `loadTrainerMembers()` now computes KPIs from the response data and updates the 4 KPI cards. The "✔ حاضر" badge is now clickable (`.view-history-btn`) to open the history modal (`renderer.js:1879-1910`)
+- `loadTrainerAttendanceToday()` fetches and renders today's attendance log table (`renderer.js:1917-1948`)
+- `openAttendanceHistory()` / `closeAttendanceHistory()` manage the history modal — fetches records from the API, renders date/time rows, click-outside-to-close (`renderer.js:1950-1990`)
+- Refresh button in the trainer tab header wired to `initTrainerDashboard()` (`renderer.js:1992-1995`)
+
+## Previous Session (2026-06-10) — Financial Inventory + Treasury Deposit
+**Feature**: Financial inventory mechanism for receptionist and treasury deposit. New `treasury_deposits` table (id, deposit_date, amount, deposited_by, notes) in `database.js:116-120`. Backend: `shiftController.js` adds `getFinancialSummary()` — returns today's cash/card totals, expenses total, net expected cash, and existing deposit info; `reconcileAndDeposit()` — transactional reconciliation (`shift_logs` entry + `treasury_deposits` insert) with discrepancy calculation (متطابق/فائض/عجز). Routes: `GET /api/shift/financial-summary` and `POST /api/shift/reconcile-and-deposit` in `routes/shifts.js`. Frontend: new sidebar button "الجرد المالي" (data-tab="employee-financial") and tab panel in `index.html` — 4 KPI cards (نقدية, بطاقة, مصروفات, صافي متوقع), cash input with auto discrepancy display (green/amber/rose), "إيداع في الخزينة" button; disabled state after deposit with success checkmark. Auto-loads on tab switch via MutationObserver.
+
+## Previous Session (2026-06-10) — Strict Subscription Renewal Guard
+**Feature**: Enforce business rule — member with active subscription cannot be charged for renewal. Backend: `paymentController.js:24-30` checks `IF status='active' AND expiry_date > today` before transaction, returns HTTP 409 with `code: 'SUBSCRIPTION_STILL_ACTIVE'`. Frontend: active member cards in `renderer.js:976` show "🔒 مقفل للتجديد" badge instead of 💳 pay button (only expired members get the pay button). Payment form handler `renderer.js:1943-1946` shows amber warning for `SUBSCRIPTION_STILL_ACTIVE` code as belt-and-suspenders defense.
+
+## Previous Session (2026-06-10) — Automated Subscription & Payment Lifecycle Module
+**Feature**: Full payment+subscription workflow. New `payments` table (id, member_id, plan_id, amount, method, payment_date, created_at) in `database.js:97-105`. New `paymentController.js` with `processPayment()` using MySQL transaction (`BEGIN/COMMIT/ROLLBACK` via `pool.getConnection()`) — inserts payment record + updates member status/expiry/fee_paid atomically. New route `POST /api/payments/process` in `routes/payments.js`, registered in `server.js:7,18`. IPC handler `processMembershipPayment` in `main.js:92-119` forwards to Express via `http.request`. Exposed via `preload.js:5` as `window.api.processMembershipPayment()`.
+
+**Frontend**: "Payment Checkout Modal" (`#payment-modal`) in `index.html:748-794` — plan dropdown, amount (auto-filled), payment method radio (cash/card), review summary (plan, duration, amount, new expiry), success animation. "💳" pay button added to active member cards (`renderer.js:972`) and "💳 دفع" button to expired member cards (`renderer.js:986`). `openPaymentModal()` / `closePaymentModal()` / `loadPaymentPlans()` / `updatePaymentSummary()` in `renderer.js:1800-1950`. On success: checkmark animation, auto-refresh members list. Falls back to direct `apiFetch()` if IPC unavailable.
+
+## Previous Session (2026-06-10) — Login Screen Bypass Bugfix
+**Bugfix**: Login screen was skipped on fresh app start — user taken directly to role page (manager/trainer/receptionist). Root cause: `localStorage` persists across Electron app restarts, so the session persistence fix made the stale session survive app close/reopen. Fix: `renderer.js:145-153` — session restored only on `navigation.type === 'reload'` (page refresh within session), cleared on `'navigate'` (fresh app start). Uses `performance.getEntriesByType('navigation')[0]?.type` to differentiate.
+
+## Previous Session (2026-06-09) — Session Persistence Bugfix
+**Bugfix**: Username disappeared from sidebar (`#sidebar-user-name`) on page reload. Root cause: `sessionStorage` is cleared on Electron `BrowserWindow` reload. Fix: replaced `sessionStorage` with `localStorage` in `setSession()`, `clearSession()`, `getSession()` within `renderer.js` (lines 31, 35, 40). `logoutUser()` still calls `clearSession()` → `localStorage.removeItem`, so logout remains clean. No new files, no API changes.
+
+## Previous Session (2026-06-09) — Smart Member Search replaces QR/Barcode Scanner
+**Feature**: Replaced the barcode/scanner receptionist tab with a debounced "Smart Member Search" interface. Receptionist now searches members by name or phone number with 300ms debounce and selects from results to confirm entry.
+
+**Backend**:
+- Added `searchMembers` controller in `memberController.js` — `GET /api/members/search?q=...` with `SELECT ... FROM members LEFT JOIN plans WHERE name LIKE ? OR phone LIKE ? LIMIT 10` (parameterized query, SQL-injection safe)
+- Added search endpoint to `routes/members.js`
+- Added `searchMember` IPC handler in `main.js` — forwards query to Express API via `http` module
+- Exposed `window.api.searchMember(query)` in `preload.js` via `contextBridge` + `ipcRenderer.invoke`
+
+**Frontend**:
+- Replaced scanner tab HTML (`#tab-employee-scanner`) with: search input (`#member-search-input`), results table (Name, Phone, Status, Expiry Date), selected-member card with "تأكيد الدخول" (Confirm Entry) button
+- Updated `renderer.js`: debounced input handler (300ms), `renderSearchResults()` renders results table with `selectMember()` onclick, `confirmEntryBtn` calls existing `POST /api/checkin`
+- Status card and recent logs preserved; `resetUI()` and `switchTab()` updated for new element IDs
+- Removed orphaned CSS `#scan-input:focus` → replaced with `#member-search-input:focus`
+
+**No QR libraries removed** — project had no QR dependencies (barcode scanner was a manual text input).
+
+**Previous Session (2026-06-09) — Staff Phone Field + Tab Layout Redesign**
+**Feature**: Added `phone` field to employees. New `phone VARCHAR(50)` column in employees table (auto-migration). Backend `createEmployee` / `updateEmployee` / `getAllEmployees` / `getStaffToday` now handle phone. Frontend: phone input in staff form, phone column in staff table, edit support.
+
+**Visual Polish**: Restructured `#tab-manager-plans` and `#tab-manager-staff` in `src/frontend/index.html` from stacked (form above table) to side-by-side grid (`grid-cols-5` with `col-span-2` form + `col-span-3` table), matching the financial tab layout pattern for visual balance and professionalism.
+
+## Previous Session (2026-06-07) — Member Classification by Plan
+**Feature: Classify Members by Subscription Plan** — Added `GET /api/employee/members/by-plan` endpoint in `memberController.js` + `routes/members.js`. Frontend: added "الكل" / "حسب الباقة" toggle buttons in employee-members tab; "حسب الباقة" view renders members grouped by plan (Weightlifting, Calisthenics, MMA, General) with active/expired counts per plan.
+
+**Usage**: Read this index first (0.3KB). Load only the sub-file relevant to current task.
