@@ -1,5 +1,5 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-  const API_BASE = 'http://localhost:3000/api';
+  const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000/api' : '/api';
   let currentUser = null;
 
   // ================================================================
