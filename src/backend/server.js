@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config();;
+
 const membersRouter = require('./routes/members');
 const managerRouter = require('./routes/manager');
 const plansRouter = require('./routes/plans');
@@ -9,7 +11,7 @@ const shiftsRouter = require('./routes/shifts');
 const { initializeDatabase } = require('./config/database');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cors());

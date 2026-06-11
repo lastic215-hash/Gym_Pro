@@ -16,7 +16,10 @@
 - Optimistic UI — button toggles immediately on click, syncs with server in background (5s timeout, reverts on error).
 - Manager staff table badges: 🟢 نشط (green) / 🔴 غير نشط (red).
 
-## Current Session (2026-06-11) — Enhanced Trainer Dashboard
+## Current Session (2026-06-11) — Render Deployment Compatibility
+**Feature**: `server.js` now reads `PORT` from `process.env` with fallback to `3000` for local development. Added `npm run start:render` script (`node src/backend/server.js`) for Render's start command. Deploy on Render with: `npm run start:render` (Render auto-injects `PORT` env var).
+
+## Previous Session (2026-06-11) — Enhanced Trainer Dashboard
 **Feature**: Transformed the basic trainer members table into a full trainer dashboard with KPI cards, today's attendance log, and per-member attendance history.
 
 **Backend**: Two new endpoints in `memberController.js`:
