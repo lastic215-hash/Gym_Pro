@@ -19,7 +19,11 @@
 ## Current Session (2026-06-11) — Render Deployment Compatibility
 **Feature**: `server.js` now reads `PORT` from `process.env` with fallback to `3000` for local development. Added `npm run start:render` script (`node src/backend/server.js`) for Render's start command. Deploy on Render with: `npm run start:render` (Render auto-injects `PORT` env var).
 
-**renderer.js fix**: `API_BASE` now dynamically detects environment — uses relative path `/api` when served via HTTP (Render/localhost), and falls back to `http://localhost:3000/api` when loaded via `file://` protocol (Electron). This ensures API calls work on Render without hardcoding the domain.
+**renderer.js fix**: `API_BASE` detects 3 environments:
+- **Production (non-localhost)** → `/api` (Render, same-origin)
+- **Local Express on :3000** → `/api` (same-origin)
+- **Electron / Live Server** → `http://localhost:3000/api` (cross-origin fallback)
+This covers Render, local Express, Electron, and Live Server workflows.
 
 ## Previous Session (2026-06-11) — Enhanced Trainer Dashboard
 **Feature**: Transformed the basic trainer members table into a full trainer dashboard with KPI cards, today's attendance log, and per-member attendance history.

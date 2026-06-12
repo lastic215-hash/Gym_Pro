@@ -1,5 +1,6 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-  const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000/api' : '/api';
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const API_BASE = (window.location.protocol === 'file:' || (isLocal && window.location.port !== '3000')) ? 'http://localhost:3000/api' : '/api';
   let currentUser = null;
 
   // ================================================================
