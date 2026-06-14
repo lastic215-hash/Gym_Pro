@@ -5,5 +5,9 @@ contextBridge.exposeInMainWorld('api', {
   processMembershipPayment: (paymentDetails) => ipcRenderer.invoke('processMembershipPayment', paymentDetails),
   getMemberStatus: (memberId) => ipcRenderer.invoke('getMemberStatus', memberId),
   getShiftSummary: () => ipcRenderer.invoke('getShiftSummary'),
-  closeShift: (shiftData) => ipcRenderer.invoke('closeShift', shiftData)
+  closeShift: (shiftData) => ipcRenderer.invoke('closeShift', shiftData),
+  getConnectionStatus: () => ipcRenderer.invoke('getConnectionStatus'),
+  onConnectionChange: (callback) => {
+    ipcRenderer.on('connection-changed', (_event, data) => callback(data));
+  }
 });

@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();;
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const membersRouter = require('./routes/members');
 const managerRouter = require('./routes/manager');
@@ -23,10 +23,32 @@ app.use('/api/shift', shiftsRouter);
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 const { cleanupOldAttendance } = require('./controllers/memberController');
+const { SyncEngine } = require('./utils/syncEngine');
+
+let syncEngine = null;
+let serverOnline = false;
+
+// Health / sync-status endpoint
+app.get('/api/health', (_req, res) => {
+  res.json({
+    online: serverOnline,
+    sync_queue: syncEngine ? syncEngine.lastSyncResult : 0
+  });
+});
 
 async function start() {
   try {
-    await initializeDatabase();
+    const smartPool = await initializeDatabase();
+
+    syncEngine = new SyncEngine(smartPool);
+    syncEngine.start();
+
+    serverOnline = smartPool.isOnline;
+    smartPool.onEvent((event) => {
+      if (event === 'online') serverOnline = true;
+      if (event === 'offline') serverOnline = false;
+    });
+
     app.listen(PORT, () => {
       console.log(`Gym server running on http://localhost:${PORT}`);
       if (process.send) process.send('server-ready');
@@ -37,7 +59,6 @@ async function start() {
     setInterval(cleanupOldAttendance, 60 * 60 * 1000);
   } catch (error) {
     console.error('Failed to start server:', error.message);
-    console.error('Make sure MySQL is running and credentials are correct in src/backend/config/database.js');
     process.exit(1);
   }
 }

@@ -1,28 +1,36 @@
 const mysql = require('mysql2/promise');
-const DB_CONFIG = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT, 10) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'Root@123',
-  database: process.env.DB_NAME || 'gym_pro',
+const { SmartPool } = require('./smartPool');
+
+// Local MySQL (always available on same machine)
+const LOCAL_CONFIG = {
+  host: process.env.LOCAL_DB_HOST || 'localhost',
+  port: parseInt(process.env.LOCAL_DB_PORT, 10) || 3306,
+  user: process.env.LOCAL_DB_USER || 'root',
+  password: process.env.LOCAL_DB_PASSWORD || 'Root@123',
+  database: process.env.LOCAL_DB_NAME || 'gym_pro',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   charset: 'utf8mb4'
 };
-const pool = mysql.createPool(DB_CONFIG);
-async function initializeDatabase() {
-  const initConn = await mysql.createConnection({
-    host: DB_CONFIG.host,
-    port: DB_CONFIG.port,
-    user: DB_CONFIG.user,
-    password: DB_CONFIG.password
-  });
-  await initConn.execute(
-    `CREATE DATABASE IF NOT EXISTS \`${DB_CONFIG.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-  );
-  await initConn.end();
-  await pool.execute(`CREATE TABLE IF NOT EXISTS members (
+
+// Cloud MySQL (Railway)
+const CLOUD_CONFIG = {
+  host: process.env.DB_HOST || 'acela.proxy.rlwy.net',
+  port: parseInt(process.env.DB_PORT, 10) || 3306,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'Root@123',
+  database: process.env.DB_NAME || 'gym_pro',
+  waitForConnections: true,
+  connectionLimit: 5,
+  queueLimit: 0,
+  charset: 'utf8mb4'
+};
+
+let smartPool = null;
+
+const SCHEMA_SQL = [
+  `CREATE TABLE IF NOT EXISTS members (
     id VARCHAR(10) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
@@ -32,15 +40,15 @@ async function initializeDatabase() {
     expiry_date DATE,
     status VARCHAR(20) DEFAULT 'active',
     fee_paid DECIMAL(10,2) DEFAULT 0
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS plans (
+  )`,
+  `CREATE TABLE IF NOT EXISTS plans (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     duration_days INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
     status VARCHAR(50) DEFAULT 'active'
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS employees (
+  )`,
+  `CREATE TABLE IF NOT EXISTS employees (
     id VARCHAR(10) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     role VARCHAR(50),
@@ -48,21 +56,21 @@ async function initializeDatabase() {
     work_start TIME,
     work_end TIME,
     password VARCHAR(255)
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS attendance (
+  )`,
+  `CREATE TABLE IF NOT EXISTS attendance (
     id INT AUTO_INCREMENT PRIMARY KEY,
     member_id VARCHAR(10),
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS trainer_attendance (
+  )`,
+  `CREATE TABLE IF NOT EXISTS trainer_attendance (
     id INT AUTO_INCREMENT PRIMARY KEY,
     member_id VARCHAR(10) NOT NULL,
     trainer_id VARCHAR(10) NOT NULL,
     attendance_date DATE NOT NULL,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_attendance (member_id, trainer_id, attendance_date)
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS expenses (
+  )`,
+  `CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     description VARCHAR(255) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -71,23 +79,15 @@ async function initializeDatabase() {
     created_by VARCHAR(255) DEFAULT NULL,
     created_by_id VARCHAR(50) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS audit_logs (
+  )`,
+  `CREATE TABLE IF NOT EXISTS audit_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_role VARCHAR(100),
     user_name VARCHAR(255),
     action_details TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN specialization VARCHAR(100) DEFAULT NULL"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN phone VARCHAR(50) DEFAULT NULL"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN is_clocked_in TINYINT(1) DEFAULT 0"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN last_clock_in DATETIME DEFAULT NULL"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN base_salary DECIMAL(10,2) DEFAULT 0"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE employees ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT 10.00"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE expenses ADD COLUMN created_by VARCHAR(255) DEFAULT NULL"); } catch (_) {}
-  try { await pool.execute("ALTER TABLE expenses ADD COLUMN created_by_id VARCHAR(50) DEFAULT NULL"); } catch (_) {}
-  await pool.execute(`CREATE TABLE IF NOT EXISTS trainer_sessions (
+  )`,
+  `CREATE TABLE IF NOT EXISTS trainer_sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     trainer_id VARCHAR(10) NOT NULL,
     member_id VARCHAR(10) NOT NULL,
@@ -97,8 +97,8 @@ async function initializeDatabase() {
     confirmed_by VARCHAR(10),
     confirmed_at DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS payments (
+  )`,
+  `CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     member_id VARCHAR(10) NOT NULL,
     plan_id INT NOT NULL,
@@ -106,8 +106,8 @@ async function initializeDatabase() {
     method VARCHAR(50) NOT NULL,
     payment_date DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS shift_logs (
+  )`,
+  `CREATE TABLE IF NOT EXISTS shift_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     shift_date DATE NOT NULL,
     expected_total DECIMAL(10,2) NOT NULL,
@@ -116,21 +116,133 @@ async function initializeDatabase() {
     status VARCHAR(50) NOT NULL,
     closed_by VARCHAR(255),
     closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS treasury_deposits (
+  )`,
+  `CREATE TABLE IF NOT EXISTS treasury_deposits (
     id INT AUTO_INCREMENT PRIMARY KEY,
     deposit_date DATE NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     deposited_by VARCHAR(255),
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-  await pool.execute(`CREATE TABLE IF NOT EXISTS employee_workdays (
+  )`,
+  `CREATE TABLE IF NOT EXISTS employee_workdays (
     id INT AUTO_INCREMENT PRIMARY KEY,
     employee_id VARCHAR(10) NOT NULL,
-    day_of_week TINYINT NOT NULL COMMENT '0=Sunday,1=Monday,2=Tuesday,3=Wednesday,4=Thursday,5=Friday,6=Saturday',
+    day_of_week TINYINT NOT NULL,
     UNIQUE KEY unique_emp_day (employee_id, day_of_week)
-  )`);
-  console.log('Database initialized successfully');
+  )`,
+  `CREATE TABLE IF NOT EXISTS __sync_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(100) NOT NULL,
+    operation VARCHAR(20) NOT NULL,
+    sql_text TEXT NOT NULL,
+    params_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`
+];
+
+const MIGRATIONS = [
+  "ALTER TABLE employees ADD COLUMN specialization VARCHAR(100) DEFAULT NULL",
+  "ALTER TABLE employees ADD COLUMN phone VARCHAR(50) DEFAULT NULL",
+  "ALTER TABLE employees ADD COLUMN is_clocked_in TINYINT(1) DEFAULT 0",
+  "ALTER TABLE employees ADD COLUMN last_clock_in DATETIME DEFAULT NULL",
+  "ALTER TABLE employees ADD COLUMN base_salary DECIMAL(10,2) DEFAULT 0",
+  "ALTER TABLE employees ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT 10.00",
+  "ALTER TABLE expenses ADD COLUMN created_by VARCHAR(255) DEFAULT NULL",
+  "ALTER TABLE expenses ADD COLUMN created_by_id VARCHAR(50) DEFAULT NULL"
+];
+
+async function _initSchema(pool) {
+  for (const sql of SCHEMA_SQL) {
+    await pool.execute(sql);
+  }
+  for (const sql of MIGRATIONS) {
+    try { await pool.execute(sql); } catch (_) {}
+  }
 }
-module.exports = { pool, initializeDatabase };
+
+async function _ensureLocalDatabaseExists() {
+  const conn = await mysql.createConnection({
+    host: LOCAL_CONFIG.host,
+    port: LOCAL_CONFIG.port,
+    user: LOCAL_CONFIG.user,
+    password: LOCAL_CONFIG.password
+  });
+  await conn.execute(
+    `CREATE DATABASE IF NOT EXISTS \`${LOCAL_CONFIG.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+  );
+  await conn.end();
+}
+
+async function initializeDatabase() {
+  // Ensure local DB and schema exist
+  try {
+    await _ensureLocalDatabaseExists();
+  } catch (e) {
+    console.error('[database] Cannot connect to local MySQL:', e.message);
+    throw new Error('Local MySQL is required. Make sure MySQL is running on localhost:3306');
+  }
+
+  smartPool = new SmartPool(LOCAL_CONFIG, CLOUD_CONFIG);
+
+  // Init local pool
+  const ok = await smartPool.initLocalPool();
+  if (!ok) throw new Error('Failed to initialize local MySQL pool');
+
+  // Create schema on local DB (tables + migrations + sync queue)
+  await _initSchema(smartPool.localPool);
+  console.log('[database] Local MySQL schema ready');
+
+  // Try connecting to cloud (Railway) - non-fatal
+  await smartPool.tryConnectCloud();
+
+  // If cloud is reachable, ensure its schema too
+  if (smartPool.cloudPool) {
+    try {
+      await _initSchema(smartPool.cloudPool);
+      console.log('[database] Cloud MySQL (Railway) schema verified');
+    } catch (e) {
+      console.warn('[database] Could not verify cloud schema:', e.message);
+    }
+  }
+
+  smartPool.startHealthCheck(15000);
+  console.log('[database] Initialized (cloud:', smartPool.isOnline ? 'connected' : 'offline', ')');
+
+  return smartPool;
+}
+
+const pool = new Proxy({}, {
+  get(target, prop) {
+    if (prop === 'execute') {
+      return async (sql, params) => {
+        if (!smartPool) throw new Error('Database not initialized. Call initializeDatabase() first.');
+        return smartPool.execute(sql, params);
+      };
+    }
+    if (prop === 'getConnection') {
+      return async () => {
+        if (!smartPool) throw new Error('Database not initialized.');
+        return smartPool.getConnection();
+      };
+    }
+    if (prop === 'end') {
+      return async () => {
+        if (smartPool) await smartPool.end();
+      };
+    }
+    if (prop === 'isOnline') {
+      return smartPool ? smartPool.isOnline : false;
+    }
+    if (prop === 'onEvent') {
+      return (cb) => { if (smartPool) smartPool.onEvent(cb); };
+    }
+    return undefined;
+  }
+});
+
+function setStatusCallback(cb) {
+  if (smartPool) smartPool.onEvent(cb);
+}
+
+module.exports = { pool, initializeDatabase, setStatusCallback };

@@ -8,7 +8,7 @@ let serverProcess = null;
 function startServer() {
   return new Promise((resolve, reject) => {
     serverProcess = fork(path.join(__dirname, 'src', 'backend', 'server.js'), [], {
-      env: { ...process.env, DB_PASSWORD: process.env.DB_PASSWORD || 'Root@123' },
+      env: { ...process.env },
       silent: true
     });
 
@@ -177,6 +177,21 @@ ipcMain.handle('closeShift', async (_event, shiftData) => {
     req.on('error', (err) => { resolve({ success: false, message: err.message }); });
     req.write(postData);
     req.end();
+  });
+});
+
+// IPC handler: Get connection status (online/offline)
+ipcMain.handle('getConnectionStatus', async () => {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:3000/api/health', (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch (_) { resolve({ online: false }); }
+      });
+    });
+    req.setTimeout(3000, () => { req.destroy(); resolve({ online: false }); });
+    req.on('error', () => { resolve({ online: false }); });
   });
 });
 

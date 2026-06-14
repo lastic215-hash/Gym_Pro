@@ -2,7 +2,7 @@
 
 | # | Issue | Location |
 |---|-------|----------|
-| 1 | `contextBridge` empty (no IPC methods exposed); rest uses direct `fetch()` | `preload.js` |
+| 1 | `contextBridge` partially exposed (getConnectionStatus, onConnectionChange); rest uses direct `fetch()` | `preload.js` |
 | 2 | No centralized Express error handler | `server.js` |
 | 3 | Plain-text passwords in DB + sessionStorage | `database.js`, `memberController.js` |
 | 4 | Role auth spoofable — member/trainer routes trust client `x-user-role` | All controllers |

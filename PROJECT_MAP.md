@@ -1,5 +1,66 @@
 # GYM Pro — External Memory Index
 
+## Current Session (2026-06-14) — Offline-First Architecture: Local MySQL + Railway Sync
+
+**Architecture**: Offline-First. All reads/writes go to **local MySQL**. Railway cloud is a secondary target for sync only.
+
+**Behavior**:
+| Condition | Read from | Write to | Queue for sync |
+|-----------|-----------|----------|----------------|
+| Online (Railway reachable) | Local MySQL | Local MySQL | Yes → `__sync_queue` |
+| Offline (Railway unreachable) | Local MySQL | Local MySQL | No (queued when online later) |
+
+**SyncEngine**: Reads `__sync_queue` from local MySQL → replays on Railway via `cloudPool` → deletes from queue.
+
+**Key fix**: Removed dual-write inconsistency. No race condition (the cloud pool is never in the hot path).
+
+**Feature**: Dual MySQL database architecture with transparent online/offline fallback and background sync.
+
+**Core change**: Replaced raw `mysql2/promise` pool in `database.js` with `SmartPool` (`src/backend/config/smartPool.js`) — a proxy class that manages two MySQL pools:
+- **Local MySQL** (`localhost:3306`, user `root`, password from `LOCAL_DB_PASSWORD` or default `Root@123`) — always available on the same machine
+- **Cloud MySQL** (Railway `acela.proxy.rlwy.net`, credentials from `.env`) — online target
+- `pool.execute()` → tries Railway first; on connection failure (internet down), auto-falls back to local MySQL
+- `pool.getConnection()` → returns `SmartConnection` bound to whichever pool is active
+- Periodic health check (every 15s) via `startHealthCheck()` — reconnects to Railway when back online
+
+**New files**:
+| File | Purpose |
+|------|---------|
+| `src/backend/config/smartPool.js` | `SmartPool` class — dual MySQL pool management |
+| `src/backend/utils/syncEngine.js` | `SyncEngine` — flushes `__sync_queue` from local MySQL to Railway MySQL |
+
+**Sync mechanism**:
+- Offline writes are logged to `__sync_queue` table (SQL + params as JSON) in **local** MySQL
+- When SmartPool detects reconnection → `SyncEngine.sync()` replays queued operations on Railway (retry up to 3x)
+- Background sync every 30s + immediate sync on reconnection
+- Failed syncs are removed from queue (max 3 retries, logged)
+- Frontend sync badge in sidebar (green "متصل بالسحابة" / amber "وضع عدم الاتصال") polled every 10s via `GET /api/health`
+
+**Server startup**:
+1. `initializeDatabase()` ensures local MySQL is running (required)
+2. Creates/verifies schema on local MySQL (all 11 tables + `__sync_queue`)
+3. Tries connecting to Railway — non-fatal if unreachable
+4. If Railway reachable, verifies schema there too
+5. Express server always starts regardless of cloud state
+
+**Files modified** (surgical, 7 files touched, 0 controllers changed):
+- `package.json` — removed `better-sqlite3`, kept existing deps
+- `database.js` — dual MySQL configs, schema init for both, SmartPool creation
+- `smartPool.js` — dual pool management, auto-fallback, health check
+- `syncEngine.js` — MySQL→MySQL queue replay
+- `server.js` — added `/api/health`, sync engine init
+- `main.js` — IPC handler `getConnectionStatus`
+- `preload.js` — exposed `getConnectionStatus`, `onConnectionChange`
+- `renderer.js` — sync status polling + badge update
+- `index.html` — single `<div id="sync-status">` added in sidebar
+
+**Files NOT touched** (no regression risk):
+- All 6 controllers — unchanged, still `const { pool } = require('../config/database')`
+- All 5 route files — unchanged
+- `activityLogger.js` — unchanged
+
+## Last Session (2026-06-14) — Auto-Cleanup Old Attendance Every 24h
+
 | File | Size | Content |
 |------|------|---------|
 | [MAP_STACK.md](MAP_STACK.md) | 0.5KB | Electron 42 + Express 5 + MySQL2 + Tailwind CDN |

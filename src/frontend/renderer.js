@@ -18,14 +18,20 @@
   async function apiFetch(url, options = {}) {
     const headers = { ...options.headers };
     if (currentUser) {
-      // Custom x-* headers may be stripped by extensions or rejected for non-ASCII values,
-      // so also pass role as a query parameter for server-side authorization.
       headers['x-user-role'] = currentUser.role;
       headers['x-user-name'] = currentUser.id;
       const sep = url.includes('?') ? '&' : '?';
       url += sep + 'role=' + encodeURIComponent(currentUser.role) + '&displayName=' + encodeURIComponent(currentUser.name);
     }
-    return fetch(url, { ...options, headers });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const opts = { ...options, headers, signal: controller.signal };
+    try {
+      const res = await fetch(url, opts);
+      return res;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
 
@@ -237,6 +243,47 @@
       }
     });
   }
+
+  // ================================================================
+  //  SYNC STATUS MONITOR
+  // ================================================================
+  const syncStatusEl = document.getElementById('sync-status');
+  const syncStatusText = document.getElementById('sync-status-text');
+
+  async function updateSyncStatus() {
+    if (!syncStatusEl) return;
+    try {
+      const res = await fetch(API_BASE + '/health');
+      const data = await res.json();
+      if (data.online) {
+        syncStatusEl.className = 'mt-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-center border transition-all duration-200 bg-emerald-900/20 text-emerald-400 border-emerald-800/30';
+        syncStatusText.textContent = 'متصل بالسحابة';
+      } else {
+        syncStatusEl.className = 'mt-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-center border transition-all duration-200 bg-amber-900/20 text-amber-400 border-amber-800/30';
+        syncStatusText.textContent = 'وضع عدم الاتصال';
+      }
+      syncStatusEl.classList.remove('hidden');
+    } catch (_) {
+      syncStatusEl.className = 'mt-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-center border transition-all duration-200 bg-rose-900/20 text-rose-400 border-rose-800/30';
+      syncStatusText.textContent = 'غير متصل';
+      syncStatusEl.classList.remove('hidden');
+    }
+  }
+
+  // Poll sync status every 10 seconds after login
+  let syncInterval = null;
+  function startSyncMonitor() {
+    updateSyncStatus();
+    if (syncInterval) clearInterval(syncInterval);
+    syncInterval = setInterval(updateSyncStatus, 10000);
+  }
+
+  // Hook into enterApp to start sync monitor
+  const _origEnterApp = enterApp;
+  enterApp = function() {
+    _origEnterApp();
+    startSyncMonitor();
+  };
 
   function switchTab(tabId) {
     const targetPanel = document.getElementById('tab-' + tabId);
@@ -2097,6 +2144,7 @@
       const work_start = document.getElementById('staff-work-start').value || null;
       const work_end = document.getElementById('staff-work-end').value || null;
       const password = document.getElementById('staff-password').value.trim();
+      const submitBtn = document.getElementById('staff-submit-btn');
       const resultDiv = document.getElementById('staff-result');
       if (resultDiv) resultDiv.classList.add('hidden');
       if (!name || !role) {
@@ -2115,6 +2163,10 @@
         }
         return;
       }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'جاري الإضافة...';
+      submitBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+      submitBtn.classList.add('bg-slate-600', 'cursor-not-allowed');
       try {
         const url = editId ? API_BASE + '/manager/employees/' + editId : API_BASE + '/manager/employees';
         const method = editId ? 'PUT' : 'POST';
@@ -2136,7 +2188,6 @@
         if (data.success) {
           resetStaffForm();
           loadStaffTable();
-          if (typeof initManagerDashboard === 'function') initManagerDashboard();
         }
       } catch (_) {
         if (resultDiv) {
@@ -2144,6 +2195,11 @@
           resultDiv.textContent = 'تعذر الاتصال بالخادم';
           resultDiv.classList.remove('hidden');
         }
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = editId ? 'تحديث الموظف' : 'إضافة الموظف';
+        submitBtn.classList.remove('bg-slate-600', 'cursor-not-allowed');
+        submitBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
       }
     });
   }
