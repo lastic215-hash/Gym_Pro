@@ -16,7 +16,40 @@
 - Optimistic UI — button toggles immediately on click, syncs with server in background (5s timeout, reverts on error).
 - Manager staff table badges: 🟢 نشط (green) / 🔴 غير نشط (red).
 
-## Current Session (2026-06-11) — Render Deployment Compatibility
+## Current Session (2026-06-14) — Auto-Cleanup Old Attendance Every 24h
+
+**Bugfix 1 — Failed check-ins leak**: `checkInMember` logged ALL check-in attempts (including expired/frozen) to `attendance` table before validation, causing `loadRecentAttendance` to show failed check-ins as "مقبول". Fix: moved `INSERT INTO attendance` after frozen/expiry checks. No changes to `getRecentAttendance` or `loadRecentAttendance` needed — all logged entries are now genuine successful check-ins.
+
+**Bugfix 2 — مرفوض row in logs table**: `confirmEntryBtn` handler added a row to `logsBody` even for failed check-ins ("مرفوض"), persisting until next tab switch. Fix: only add row when `data.success === true`.
+
+**Feature — Auto-cleanup every 24h**: New `cleanupOldAttendance()` in `memberController.js` — deletes attendance records older than 24 hours. Runs on server start + every 1h via `setInterval` in `server.js`. New test endpoint `DELETE /api/attendance/cleanup` returns `{ deleted_count: N }`. This keeps the recent attendance list clean and prevents unbounded table growth.
+
+## Previous Session (2026-06-14) — Trainer Workdays Schedule (Manager + Receptionist)
+**Feature**: New `employee_workdays` table (id, employee_id, day_of_week) in `database.js:128-132`. Backend: `saveEmployeeWorkdays`, `getEmployeeWorkdays`, `getAllTrainersWorkdays` in `managerController.js:264-309`. Routes: `POST /api/manager/employees/workdays` (manager add/edit), `GET /api/manager/employees/workdays/:id` (manager), `GET /api/employee/trainers/workdays` (any role) in `routes/manager.js:43-44` and `routes/members.js:43-47`.
+
+**Frontend — Manager staff tab**: Workdays section below the employee grid in `index.html` with table (trainer name, specialization, workday labels, edit button). Modal (`#workday-modal`) with checkboxes for 7 days. Save button calls POST endpoint; optimistic inline update of day labels.
+
+**Frontend — Receptionist scanner tab**: Workdays read-only table at bottom of `#tab-employee-scanner` (trainer name, specialization, workday labels, work hours). Auto-loads on tab switch via overridden `switchTab` in `renderer.js:2484-2494`. Both `loadWorkdaysManager()` and `loadWorkdaysReception()` use `GET /api/employee/trainers/workdays`.
+
+## Previous Session (2026-06-14) — Hide Admin Expenses from Receptionist
+
+**Root cause**: Admin expenses (categories: إيجار, رواتب, etc.) were summed into `net_cash_expected` in shift controller endpoints, making the receptionist see negative net cash from admin spending.
+
+**Backend fix** (`shiftController.js`): Added `AND category = 'مصروف استقبال'` to 3 expense sum queries:
+1. `getFinancialSummary()` line 103 — today's expenses for daily KPI + net cash
+2. `reconcileAndDeposit()` line 148 — today's expenses for reconciliation
+3. `getMonthlyFinancialSummary()` line 243 — monthly expenses total
+
+Now shift endpoints only count receptionist-recorded expenses (category `'مصروف استقبال'`), excluding all admin expenses.
+
+**Frontend fix** (`index.html`): Added `data-role="manager"` to 3 expense elements:
+1. Line 762 — daily expense KPI card (مصروفات اليوم)
+2. Line 775 — expense recording section (تسجيل مصروف)
+3. Line 839 — monthly expense KPI card (إجمالي المصروفات)
+
+No changes to `renderer.js` or `routes/manager.js` (manager routes already protected by `checkRole('manager')`).
+
+## Previous Session (2026-06-11) — Render Deployment Compatibility
 **Feature**: `server.js` now reads `PORT` from `process.env` with fallback to `3000` for local development. Added `npm run start:render` script (`node src/backend/server.js`) for Render's start command. Deploy on Render with: `npm run start:render` (Render auto-injects `PORT` env var).
 
 **renderer.js fix**: `API_BASE` detects 3 environments:

@@ -829,17 +829,17 @@
         const now = new Date();
         const timestamp = now.toLocaleDateString('en-US') + ' ' + now.toLocaleTimeString('en-US');
 
-        if (logsBody) {
+        if (data.success && logsBody) {
           if (logsBody.querySelector('td[colspan]')) {
             logsBody.innerHTML = '';
           }
           const row = document.createElement('tr');
-          row.className = data.success ? 'border-b border-emerald-900/30' : 'border-b border-rose-900/30';
+          row.className = 'border-b border-emerald-900/30';
           row.innerHTML =
             '<td class="py-2 px-4">' + id + '</td>' +
-            '<td class="py-2 px-4">' + (data.success ? data.name : '\u2014') + '</td>' +
+            '<td class="py-2 px-4">' + data.name + '</td>' +
             '<td class="py-2 px-4">' + timestamp + '</td>' +
-            '<td class="py-2 px-4"><span class="' + (data.success ? 'text-emerald-400' : 'text-rose-400') + '">' + (data.success ? 'مقبول' : 'مرفوض') + '</span></td>';
+            '<td class="py-2 px-4"><span class="text-emerald-400">مقبول</span></td>';
           logsBody.insertBefore(row, logsBody.firstChild);
 
           while (logsBody.children.length > 5) {
@@ -2317,6 +2317,181 @@
   if (paymentCancelBtn) {
     paymentCancelBtn.addEventListener('click', closePaymentModal);
   }
+
+  // ================================================================
+  //  TRAINER WORKDAYS  -  Manager adds, receptionist views
+  // ================================================================
+  const DAY_NAMES = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+  function renderDayCheckboxes(container, selectedDays) {
+    if (!container) return;
+    container.innerHTML = '';
+    DAY_NAMES.forEach((name, idx) => {
+      const label = document.createElement('label');
+      label.className = 'flex items-center gap-2 cursor-pointer bg-slate-800/40 rounded-lg px-3 py-2 hover:bg-slate-700/40 transition-colors';
+      const checked = selectedDays.includes(idx) ? 'checked' : '';
+      label.innerHTML =
+        '<input type="checkbox" value="' + idx + '" ' + checked + ' class="accent-emerald-500 w-4 h-4">' +
+        '<span class="text-sm text-slate-200">' + name + '</span>';
+      container.appendChild(label);
+    });
+  }
+
+  async function loadWorkdaysManager() {
+    const tbody = document.getElementById('workdays-mgr-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-slate-600" colspan="4">جاري التحميل...</td></tr>';
+    try {
+      const res = await apiFetch(API_BASE + '/employee/trainers/workdays');
+      const data = await res.json();
+      if (data.success && data.trainers.length > 0) {
+        tbody.innerHTML = '';
+        data.trainers.forEach((t) => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-slate-800/30';
+          const dayLabels = t.workdays.length > 0 ? t.workdays.sort().map(d => DAY_NAMES[d]).join(' - ') : '—';
+          tr.innerHTML =
+            '<td class="py-3 px-4 text-slate-100">' + t.name + '</td>' +
+            '<td class="py-3 px-4 text-slate-500 text-xs">' + (t.specialization || '—') + '</td>' +
+            '<td class="py-3 px-4 text-slate-300 text-xs" id="wd-display-' + t.id + '">' + dayLabels + '</td>' +
+            '<td class="py-3 px-4"><button class="edit-workday-btn bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 px-2.5 py-1 rounded text-xs transition-colors" data-id="' + t.id + '" data-name="' + t.name.replace(/"/g, '&quot;') + '">تعديل</button></td>';
+          tbody.appendChild(tr);
+        });
+
+        tbody.querySelectorAll('.edit-workday-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            openWorkdayModal(id, name);
+          });
+        });
+      } else {
+        tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-slate-600" colspan="4">لا يوجد مدربون</td></tr>';
+      }
+    } catch (_) {
+      tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-rose-500" colspan="4">خطأ في التحميل</td></tr>';
+    }
+  }
+
+  async function loadWorkdaysReception() {
+    const tbody = document.getElementById('workdays-reception-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-slate-600" colspan="4">جاري التحميل...</td></tr>';
+    try {
+      const res = await apiFetch(API_BASE + '/employee/trainers/workdays');
+      const data = await res.json();
+      if (data.success && data.trainers.length > 0) {
+        tbody.innerHTML = '';
+        data.trainers.forEach((t) => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-slate-800/30';
+          const dayLabels = t.workdays.length > 0 ? t.workdays.sort().map(d => DAY_NAMES[d]).join(' - ') : '—';
+          const schedule = (t.work_start && t.work_end) ? t.work_start.substring(0, 5) + ' - ' + t.work_end.substring(0, 5) : '—';
+          tr.innerHTML =
+            '<td class="py-3 px-4 text-slate-100">' + t.name + '</td>' +
+            '<td class="py-3 px-4 text-slate-500 text-xs">' + (t.specialization || '—') + '</td>' +
+            '<td class="py-3 px-4 text-slate-300 text-xs">' + dayLabels + '</td>' +
+            '<td class="py-3 px-4 text-slate-400 text-xs">' + schedule + '</td>';
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-slate-600" colspan="4">لا يوجد مدربون</td></tr>';
+      }
+    } catch (_) {
+      tbody.innerHTML = '<tr><td class="py-8 px-4 text-center text-rose-500" colspan="4">خطأ في التحميل</td></tr>';
+    }
+  }
+
+  let editingWorkdayId = null;
+
+  function openWorkdayModal(id, name) {
+    editingWorkdayId = id;
+    document.getElementById('workday-modal-title').textContent = 'تعديل أيام العمل';
+    document.getElementById('workday-modal-trainer').textContent = 'المدرب: ' + name;
+    document.getElementById('workday-result').classList.add('hidden');
+    document.getElementById('workday-modal').classList.remove('hidden');
+
+    apiFetch(API_BASE + '/manager/employees/workdays/' + id)
+      .then(r => r.json())
+      .then(data => {
+        const days = data.success ? data.days : [];
+        const container = document.getElementById('workday-checkboxes');
+        renderDayCheckboxes(container, days);
+      })
+      .catch(() => {
+        const container = document.getElementById('workday-checkboxes');
+        renderDayCheckboxes(container, []);
+      });
+  }
+
+  function closeWorkdayModal() {
+    document.getElementById('workday-modal').classList.add('hidden');
+    editingWorkdayId = null;
+  }
+
+  const workdaySaveBtn = document.getElementById('workday-save-btn');
+  if (workdaySaveBtn) {
+    workdaySaveBtn.addEventListener('click', async () => {
+      if (!editingWorkdayId) return;
+      const checks = document.querySelectorAll('#workday-checkboxes input[type="checkbox"]:checked');
+      const days = Array.from(checks).map(c => parseInt(c.value, 10));
+      const resultDiv = document.getElementById('workday-result');
+      resultDiv.classList.add('hidden');
+      try {
+        const res = await apiFetch(API_BASE + '/manager/employees/workdays', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: editingWorkdayId, days })
+        });
+        const data = await res.json();
+        if (data.success) {
+          resultDiv.className = 'mt-3 p-3 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-200 text-sm';
+          resultDiv.textContent = 'تم الحفظ';
+          resultDiv.classList.remove('hidden');
+          const displayEl = document.getElementById('wd-display-' + editingWorkdayId);
+          if (displayEl) displayEl.textContent = days.length > 0 ? days.sort().map(d => DAY_NAMES[d]).join(' - ') : '—';
+          closeWorkdayModal();
+        } else {
+          resultDiv.className = 'mt-3 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm';
+          resultDiv.textContent = data.message;
+          resultDiv.classList.remove('hidden');
+        }
+      } catch (_) {
+        resultDiv.className = 'mt-3 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm';
+        resultDiv.textContent = 'تعذر الاتصال بالخادم';
+        resultDiv.classList.remove('hidden');
+      }
+    });
+  }
+
+  const workdayCancelBtn = document.getElementById('workday-cancel-btn');
+  if (workdayCancelBtn) {
+    workdayCancelBtn.addEventListener('click', closeWorkdayModal);
+  }
+
+  const workdayModal = document.getElementById('workday-modal');
+  if (workdayModal) {
+    workdayModal.addEventListener('click', (e) => {
+      if (e.target === workdayModal) closeWorkdayModal();
+    });
+  }
+
+  const refreshWorkdaysMgrBtn = document.getElementById('refresh-workdays-mgr-btn');
+  if (refreshWorkdaysMgrBtn) {
+    refreshWorkdaysMgrBtn.addEventListener('click', loadWorkdaysManager);
+  }
+
+  // Load workdays on relevant tab switches
+  const origSwitchTab = switchTab;
+  switchTab = function(tabId) {
+    origSwitchTab(tabId);
+    if (tabId === 'manager-staff') {
+      loadWorkdaysManager();
+    }
+    if (tabId === 'employee-scanner') {
+      loadWorkdaysReception();
+    }
+  };
 
   if (paymentModal) {
     paymentModal.addEventListener('click', (e) => {
