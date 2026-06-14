@@ -11,7 +11,9 @@ const {
   deleteEmployee,
   updateEmployee,
   updateEmployeeSchedule,
-  getAuditLogs
+  getAuditLogs,
+  saveEmployeeWorkdays,
+  getEmployeeWorkdays
 } = require('../controllers/managerController');
 const { createPlan, updatePlan, deletePlan } = require('../controllers/planController');
 const { createExpense, getExpenses, deleteExpense, getFinancialIntelligence } = require('../controllers/financialController');
@@ -40,6 +42,8 @@ router.put('/employees/:id', checkRole('manager'), updateEmployee);
 router.delete('/employees/:id', checkRole('manager'), deleteEmployee);
 router.put('/employees/:id/schedule', checkRole('manager'), updateEmployeeSchedule);
 router.get('/audit-logs', checkRole('manager'), getAuditLogs);
+router.post('/employees/workdays', checkRole('manager'), saveEmployeeWorkdays);
+router.get('/employees/workdays/:id', checkRole('manager'), getEmployeeWorkdays);
 router.post('/expenses', checkRole('manager'), createExpense);
 router.get('/expenses', checkRole('manager'), getExpenses);
 router.delete('/expenses/:id', checkRole('manager'), deleteExpense);

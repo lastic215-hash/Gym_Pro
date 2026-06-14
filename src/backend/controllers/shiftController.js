@@ -100,7 +100,7 @@ async function getFinancialSummary(req, res) {
     });
 
     const [expenseRows] = await pool.execute(
-      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date = ?`,
+      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date = ? AND category = 'مصروف استقبال'`,
       [today]
     );
     const expensesTotal = parseFloat(expenseRows[0].total);
@@ -145,7 +145,7 @@ async function reconcileAndDeposit(req, res) {
     paymentRows.forEach(r => { if (r.method === 'cash') cashTotal = parseFloat(r.total); });
 
     const [expenseRows] = await pool.execute(
-      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date = ?`,
+      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date = ? AND category = 'مصروف استقبال'`,
       [today]
     );
     const expensesTotal = parseFloat(expenseRows[0].total);
@@ -240,7 +240,7 @@ async function getMonthlyFinancialSummary(req, res) {
     });
 
     const [expenseRows] = await pool.execute(
-      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE YEAR(expense_date) = ? AND MONTH(expense_date) = ?`,
+      `SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE category = 'مصروف استقبال' AND YEAR(expense_date) = ? AND MONTH(expense_date) = ?`,
       [year, month]
     );
     const expensesTotal = parseFloat(expenseRows[0].total);

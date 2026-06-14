@@ -261,4 +261,61 @@ async function getAuditLogs(req, res) {
   }
 }
 
-module.exports = { getDashboardStats, getPeakHours, getRevenueSpread, getStaffToday, getAllEmployees, createEmployee, clockInEmployee, deleteEmployee, updateEmployee, updateEmployeeSchedule, getAuditLogs };
+async function saveEmployeeWorkdays(req, res) {
+  try {
+    const { employee_id, days } = req.body;
+    if (!employee_id || !Array.isArray(days)) {
+      return res.status(400).json({ success: false, message: 'بيانات غير صحيحة' });
+    }
+
+    await pool.execute('DELETE FROM employee_workdays WHERE employee_id = ?', [employee_id]);
+
+    if (days.length > 0) {
+      const placeholders = days.map(() => '(?, ?)').join(',');
+      const values = [];
+      days.forEach(d => { values.push(employee_id, d); });
+      await pool.execute(`INSERT INTO employee_workdays (employee_id, day_of_week) VALUES ${placeholders}`, values);
+    }
+
+    return res.status(200).json({ success: true, message: 'تم حفظ أيام العمل' });
+  } catch (error) {
+    console.error('saveEmployeeWorkdays error:', error);
+    return res.status(500).json({ success: false, message: 'خطأ في حفظ أيام العمل' });
+  }
+}
+
+async function getEmployeeWorkdays(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.execute('SELECT day_of_week FROM employee_workdays WHERE employee_id = ? ORDER BY day_of_week', [id]);
+    return res.status(200).json({ success: true, days: rows.map(r => r.day_of_week) });
+  } catch (error) {
+    console.error('getEmployeeWorkdays error:', error);
+    return res.status(500).json({ success: false, message: 'خطأ في جلب أيام العمل' });
+  }
+}
+
+async function getAllTrainersWorkdays(req, res) {
+  try {
+    const [trainers] = await pool.execute("SELECT id, name, phone, specialization, work_start, work_end FROM employees WHERE role = 'مدرب' ORDER BY name");
+    const [workdays] = await pool.execute('SELECT employee_id, day_of_week FROM employee_workdays ORDER BY employee_id, day_of_week');
+
+    const workdaysMap = {};
+    workdays.forEach(w => {
+      if (!workdaysMap[w.employee_id]) workdaysMap[w.employee_id] = [];
+      workdaysMap[w.employee_id].push(w.day_of_week);
+    });
+
+    const trainersWithDays = trainers.map(t => ({
+      ...t,
+      workdays: workdaysMap[t.id] || []
+    }));
+
+    return res.status(200).json({ success: true, trainers: trainersWithDays });
+  } catch (error) {
+    console.error('getAllTrainersWorkdays error:', error);
+    return res.status(500).json({ success: false, message: 'خطأ في جلب أيام العمل' });
+  }
+}
+
+module.exports = { getDashboardStats, getPeakHours, getRevenueSpread, getStaffToday, getAllEmployees, createEmployee, clockInEmployee, deleteEmployee, updateEmployee, updateEmployeeSchedule, getAuditLogs, saveEmployeeWorkdays, getEmployeeWorkdays, getAllTrainersWorkdays };

@@ -52,9 +52,6 @@ async function checkInMember(req, res) {
       return res.status(404).json({ success: false, message: "لم يتم العثور على العضو" });
     }
 
-    // Record attendance — logged for every valid member, regardless of freeze/expiry
-    await pool.execute('INSERT INTO attendance (member_id) VALUES (?)', [id]);
-
     if (member.status === 'frozen') {
       return res.status(400).json({ success: false, message: "الحساب مجمد حالياً" });
     }
@@ -64,6 +61,9 @@ async function checkInMember(req, res) {
       await pool.execute('UPDATE members SET status = ? WHERE id = ?', ['expired', id]);
       return res.status(400).json({ success: false, message: "انتهت صلاحية الاشتراك", expired: true });
     }
+
+    // Record attendance only for successful check-ins
+    await pool.execute('INSERT INTO attendance (member_id) VALUES (?)', [id]);
     return res.status(200).json({ success: true, name: member.name, message: "تم تسجيل الدخول" });
   } catch (error) {
     console.error('checkInMember error:', error);
@@ -377,6 +377,21 @@ async function searchMembers(req, res) {
   }
 }
 
+async function cleanupOldAttendance() {
+  try {
+    const [result] = await pool.execute(
+      'DELETE FROM attendance WHERE timestamp < NOW() - INTERVAL 24 HOUR'
+    );
+    if (result.affectedRows > 0) {
+      console.log(`[cleanup] Deleted ${result.affectedRows} old attendance record(s)`);
+    }
+    return result.affectedRows;
+  } catch (error) {
+    console.error('[cleanup] Error:', error.message);
+    return 0;
+  }
+}
+
 async function getRecentAttendance(req, res) {
   try {
     const limit = 5;
@@ -527,5 +542,6 @@ module.exports = {
   getRecentAttendance,
   registerAndPay,
   getTrainerAttendanceToday,
-  getMemberAttendanceHistory
+  getMemberAttendanceHistory,
+  cleanupOldAttendance
 };

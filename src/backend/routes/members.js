@@ -15,7 +15,8 @@ const {
   getRecentAttendance,
   registerAndPay,
   getTrainerAttendanceToday,
-  getMemberAttendanceHistory
+  getMemberAttendanceHistory,
+  cleanupOldAttendance
 } = require('../controllers/memberController');
 
 router.post('/auth/login', login);
@@ -43,6 +44,15 @@ router.get('/employee/attendance/history/:memberId/:trainerId', getMemberAttenda
 router.post('/employee/clock-in', async (req, res) => {
   const { clockInEmployee } = require('../controllers/managerController');
   return clockInEmployee(req, res);
+});
+router.get('/employee/trainers/workdays', async (req, res) => {
+  const { getAllTrainersWorkdays } = require('../controllers/managerController');
+  return getAllTrainersWorkdays(req, res);
+});
+
+router.delete('/attendance/cleanup', async (req, res) => {
+  const deleted = await cleanupOldAttendance();
+  res.json({ success: true, deleted_count: deleted, message: `تم حذف ${deleted} سجل(ات) قديم` });
 });
 
 module.exports = router;

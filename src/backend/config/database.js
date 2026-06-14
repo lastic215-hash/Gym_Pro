@@ -125,6 +125,12 @@ async function initializeDatabase() {
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+  await pool.execute(`CREATE TABLE IF NOT EXISTS employee_workdays (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id VARCHAR(10) NOT NULL,
+    day_of_week TINYINT NOT NULL COMMENT '0=Sunday,1=Monday,2=Tuesday,3=Wednesday,4=Thursday,5=Friday,6=Saturday',
+    UNIQUE KEY unique_emp_day (employee_id, day_of_week)
+  )`);
   console.log('Database initialized successfully');
 }
 module.exports = { pool, initializeDatabase };

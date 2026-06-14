@@ -22,6 +22,8 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/shift', shiftsRouter);
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
+const { cleanupOldAttendance } = require('./controllers/memberController');
+
 async function start() {
   try {
     await initializeDatabase();
@@ -29,6 +31,10 @@ async function start() {
       console.log(`Gym server running on http://localhost:${PORT}`);
       if (process.send) process.send('server-ready');
     });
+
+    // Run attendance cleanup every hour
+    cleanupOldAttendance();
+    setInterval(cleanupOldAttendance, 60 * 60 * 1000);
   } catch (error) {
     console.error('Failed to start server:', error.message);
     console.error('Make sure MySQL is running and credentials are correct in src/backend/config/database.js');
