@@ -8,9 +8,15 @@ class SmartConnection {
 
   async _ensureConn() {
     if (this.mysqlConn) return this.mysqlConn;
-    if (!this.smartPool.localPool) throw new Error('Local MySQL pool not available');
-    this.mysqlConn = await this.smartPool.localPool.getConnection();
-    return this.mysqlConn;
+    if (this.smartPool.localPool) {
+      this.mysqlConn = await this.smartPool.localPool.getConnection();
+      return this.mysqlConn;
+    }
+    if (this.smartPool.cloudPool) {
+      this.mysqlConn = await this.smartPool.cloudPool.getConnection();
+      return this.mysqlConn;
+    }
+    throw new Error('No database pool available');
   }
 
   async execute(sql, params) {
@@ -158,6 +164,7 @@ class SmartPool {
   }
 
   async _enqueueSync(sql, params) {
+    // Nothing to sync from if there's no local pool
     if (!this.localPool) return;
     const op = _extractOp(sql);
     const table = _extractTable(sql);
@@ -175,12 +182,18 @@ class SmartPool {
   }
 
   async execute(sql, params) {
-    if (!this.localPool) throw new Error('Local MySQL pool not initialized');
     const finalParams = params == null ? undefined : params;
+    let pool = this.localPool;
 
-    const [rows] = await this.localPool.execute(sql, finalParams);
+    if (!pool) {
+      if (!this.cloudPool) throw new Error('No database pool available');
+      pool = this.cloudPool;
+    }
 
-    if (_isMutation(sql) && !_isSyncQueueOp(sql)) {
+    const [rows] = await pool.execute(sql, finalParams);
+
+    // Only enqueue sync when local pool is the source
+    if (this.localPool && _isMutation(sql) && !_isSyncQueueOp(sql)) {
       this._enqueueSync(sql, params);
     }
 

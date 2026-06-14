@@ -20,6 +20,12 @@ class SyncEngine {
   }
 
   start() {
+    // Sync engine only makes sense when there's a local pool to sync from
+    if (!this.smartPool.localPool) {
+      console.log('[SyncEngine] No local pool — sync engine disabled');
+      return;
+    }
+
     this.smartPool.onEvent((event) => {
       if (event === 'online') {
         console.log('[SyncEngine] Cloud online, starting sync...');

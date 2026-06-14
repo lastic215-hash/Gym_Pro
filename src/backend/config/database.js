@@ -181,39 +181,52 @@ async function _ensureLocalDatabaseExists() {
 }
 
 async function initializeDatabase() {
-  // Ensure local DB and schema exist
+  let localOk = false;
+
+  // Try local MySQL — optional
   try {
     await _ensureLocalDatabaseExists();
+    localOk = true;
   } catch (e) {
-    console.error('[database] Cannot connect to local MySQL:', e.message);
-    throw new Error('Local MySQL is required. Make sure MySQL is running on localhost:3306');
+    console.warn('[database] Local MySQL not available:', e.message);
+    console.warn('[database] Will attempt to use cloud MySQL as primary');
   }
 
   smartPool = new SmartPool(LOCAL_CONFIG, CLOUD_CONFIG);
 
-  // Init local pool
-  const ok = await smartPool.initLocalPool();
-  if (!ok) throw new Error('Failed to initialize local MySQL pool');
+  // Init local pool (if local MySQL is reachable)
+  if (localOk) {
+    const ok = await smartPool.initLocalPool();
+    if (!ok) {
+      console.warn('[database] Failed to initialize local MySQL pool, falling back to cloud');
+      localOk = false;
+    }
+  }
 
-  // Create schema on local DB (tables + migrations + sync queue)
-  await _initSchema(smartPool.localPool);
-  console.log('[database] Local MySQL schema ready');
+  // Try connecting to cloud MySQL
+  const cloudOk = await smartPool.tryConnectCloud();
 
-  // Try connecting to cloud (Railway) - non-fatal
-  await smartPool.tryConnectCloud();
+  if (!localOk && !cloudOk) {
+    throw new Error('No database available. Ensure either local MySQL or cloud MySQL is configured.');
+  }
 
-  // If cloud is reachable, ensure its schema too
+  // Create schema on the available pool
+  if (smartPool.localPool) {
+    await _initSchema(smartPool.localPool);
+    console.log('[database] Local MySQL schema ready');
+  }
   if (smartPool.cloudPool) {
     try {
       await _initSchema(smartPool.cloudPool);
-      console.log('[database] Cloud MySQL (Railway) schema verified');
+      console.log('[database] Cloud MySQL schema verified');
     } catch (e) {
       console.warn('[database] Could not verify cloud schema:', e.message);
     }
   }
 
   smartPool.startHealthCheck(15000);
-  console.log('[database] Initialized (cloud:', smartPool.isOnline ? 'connected' : 'offline', ')');
+  const mode = cloudOk ? 'connected' : 'offline';
+  console.log('[database] Initialized (local:', localOk ? 'yes' : 'no', '| cloud:', mode, ')');
 
   return smartPool;
 }
