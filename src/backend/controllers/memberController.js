@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const { pool, getSmartPool } = require('../config/database');
 const { logActivity } = require('../utils/activityLogger');
 
 async function login(req, res) {
@@ -304,7 +304,9 @@ async function updateMember(req, res) {
     const plan = planRows[0];
     const current = existing[0];
 
-    let expiry_date = current.expiry_date;
+    let expiry_date = current.expiry_date instanceof Date
+      ? current.expiry_date.toISOString().split('T')[0]
+      : current.expiry_date;
     if (String(plan_id) !== String(current.plan_id)) {
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + plan.duration_days);
@@ -379,11 +381,13 @@ async function searchMembers(req, res) {
 
 async function cleanupOldAttendance() {
   try {
-    const [result] = await pool.execute(
+    const smartPool = getSmartPool();
+    if (!smartPool || !smartPool.localPool) return 0;
+    const [result] = await smartPool.localPool.execute(
       'DELETE FROM attendance WHERE timestamp < NOW() - INTERVAL 24 HOUR'
     );
     if (result.affectedRows > 0) {
-      console.log(`[cleanup] Deleted ${result.affectedRows} old attendance record(s)`);
+      console.log(`[cleanup] Deleted ${result.affectedRows} old attendance record(s) (local only)`);
     }
     return result.affectedRows;
   } catch (error) {

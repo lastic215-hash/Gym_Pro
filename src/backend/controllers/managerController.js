@@ -118,7 +118,9 @@ async function clockInEmployee(req, res) {
       return res.status(404).json({ success: false, message: "الموظف غير موجود" });
     }
 
-    const newValue = rows[0].is_clocked_in === 1 ? 0 : 1;
+    const emp = rows[0];
+    const newValue = emp.is_clocked_in === 1 ? 0 : 1;
+    const empName = emp.name;
     if (newValue === 1) {
       await pool.execute('UPDATE employees SET is_clocked_in = 1, last_clock_in = NOW() WHERE id = ?', [id]);
     } else {
@@ -126,7 +128,7 @@ async function clockInEmployee(req, res) {
     }
 
     const userName = req.headers['x-user-name'] || id;
-    await logActivity('employee', userName, 'Employee ' + rows[0].name + ' (' + id + ') clocked ' + (newValue === 1 ? 'in' : 'out'));
+    await logActivity('employee', userName, 'Employee ' + empName + ' (' + id + ') clocked ' + (newValue === 1 ? 'in' : 'out'));
 
     return res.status(200).json({ success: true, is_clocked_in: newValue, message: newValue === 1 ? 'تم تسجيل الدخول' : 'تم تسجيل الخروج' });
   } catch (error) {
@@ -318,4 +320,31 @@ async function getAllTrainersWorkdays(req, res) {
   }
 }
 
-module.exports = { getDashboardStats, getPeakHours, getRevenueSpread, getStaffToday, getAllEmployees, createEmployee, clockInEmployee, deleteEmployee, updateEmployee, updateEmployeeSchedule, getAuditLogs, saveEmployeeWorkdays, getEmployeeWorkdays, getAllTrainersWorkdays };
+async function getTrainerWorkStatus(req, res) {
+  try {
+    const { trainerId } = req.params;
+    const [empRows] = await pool.execute(
+      'SELECT id, name, role, work_start, work_end, is_clocked_in FROM employees WHERE id = ?',
+      [trainerId]
+    );
+    if (empRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'المدرب غير موجود' });
+    }
+    const today = new Date().getDay();
+    const [wdRows] = await pool.execute(
+      'SELECT day_of_week FROM employee_workdays WHERE employee_id = ? AND day_of_week = ?',
+      [trainerId, today]
+    );
+    return res.status(200).json({
+      success: true,
+      trainer: empRows[0],
+      today_day_of_week: today,
+      is_work_day: wdRows.length > 0
+    });
+  } catch (error) {
+    console.error('getTrainerWorkStatus error:', error);
+    return res.status(500).json({ success: false, message: 'خطأ في جلب حالة الدوام' });
+  }
+}
+
+module.exports = { getDashboardStats, getPeakHours, getRevenueSpread, getStaffToday, getAllEmployees, createEmployee, clockInEmployee, deleteEmployee, updateEmployee, updateEmployeeSchedule, getAuditLogs, saveEmployeeWorkdays, getEmployeeWorkdays, getAllTrainersWorkdays, getTrainerWorkStatus };

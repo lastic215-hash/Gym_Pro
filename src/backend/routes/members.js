@@ -49,6 +49,10 @@ router.get('/employee/trainers/workdays', async (req, res) => {
   const { getAllTrainersWorkdays } = require('../controllers/managerController');
   return getAllTrainersWorkdays(req, res);
 });
+router.get('/employee/trainer/work-status/:trainerId', async (req, res) => {
+  const { getTrainerWorkStatus } = require('../controllers/managerController');
+  return getTrainerWorkStatus(req, res);
+});
 
 router.delete('/attendance/cleanup', async (req, res) => {
   const deleted = await cleanupOldAttendance();

@@ -230,6 +230,7 @@
         const data = await res.json();
         if (data.success && data.is_clocked_in !== undefined) {
           currentUser.is_clocked_in = data.is_clocked_in;
+          setSession(currentUser);
           updateClockBtn();
         } else {
           // Revert on failure
@@ -2007,7 +2008,47 @@
     }
   }
 
+  async function loadTrainerWorkStatus() {
+    const card = document.getElementById('trainer-work-status');
+    if (!card) return;
+    try {
+      const res = await apiFetch(API_BASE + '/employee/trainer/work-status/' + currentUser.id);
+      const data = await res.json();
+      if (!data.success) { card.classList.add('hidden'); return; }
+
+      const DAY_NAMES = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+      const todayName = DAY_NAMES[data.today_day_of_week] || '';
+      const tr = data.trainer;
+      const isWorkDay = data.is_work_day;
+      const hours = (tr.work_start && tr.work_end) ? tr.work_start.substring(0, 5) + ' → ' + tr.work_end.substring(0, 5) : null;
+      const clockedIn = tr.is_clocked_in == 1 || tr.is_clocked_in === true;
+
+      document.getElementById('work-status-today-name').textContent = todayName;
+      card.classList.remove('hidden');
+
+      if (isWorkDay) {
+        card.className = 'mt-4 p-4 rounded-xl border transition-all duration-300 bg-emerald-950/40 border-emerald-800/40';
+        document.getElementById('work-status-icon').textContent = '✅';
+        document.getElementById('work-status-title').textContent = 'اليوم دوام';
+        document.getElementById('work-status-title').className = 'text-sm font-semibold text-emerald-300';
+        let detail = hours ? 'ساعات العمل: ' + hours : 'يوم دوام';
+        if (clockedIn) detail += ' • 🟢 مسجل الدخول';
+        else detail += ' • لم تسجل الدخول بعد';
+        document.getElementById('work-status-detail').textContent = detail;
+      } else {
+        card.className = 'mt-4 p-4 rounded-xl border transition-all duration-300 bg-slate-800/40 border-slate-700/40';
+        document.getElementById('work-status-icon').textContent = '🌙';
+        document.getElementById('work-status-title').textContent = 'اليوم إجازة';
+        document.getElementById('work-status-title').className = 'text-sm font-semibold text-slate-300';
+        document.getElementById('work-status-detail').textContent = hours ? 'ساعات العمل المعتادة: ' + hours : '';
+      }
+    } catch (_) {
+      card.classList.add('hidden');
+    }
+  }
+
   async function initTrainerDashboard() {
+    await loadTrainerWorkStatus();
     await loadTrainerMembers();
     await loadTrainerAttendanceToday();
   }

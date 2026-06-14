@@ -18,8 +18,8 @@ class SmartConnection {
     const finalParams = params == null ? undefined : params;
     const [rows] = await conn.execute(sql, finalParams);
 
-    if (this.smartPool._isOnline && _isMutation(sql) && !_isSyncQueueOp(sql)) {
-      this.smartPool._enqueueSync(sql, params).catch(() => {});
+    if (_isMutation(sql) && !_isSyncQueueOp(sql)) {
+      this.smartPool._enqueueSync(sql, params);
     }
     return [rows];
   }
@@ -180,8 +180,8 @@ class SmartPool {
 
     const [rows] = await this.localPool.execute(sql, finalParams);
 
-    if (this._isOnline && _isMutation(sql) && !_isSyncQueueOp(sql)) {
-      this._enqueueSync(sql, params).catch(() => {});
+    if (_isMutation(sql) && !_isSyncQueueOp(sql)) {
+      this._enqueueSync(sql, params);
     }
 
     return [rows];

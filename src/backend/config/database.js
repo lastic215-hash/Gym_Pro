@@ -149,7 +149,13 @@ const MIGRATIONS = [
   "ALTER TABLE employees ADD COLUMN base_salary DECIMAL(10,2) DEFAULT 0",
   "ALTER TABLE employees ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT 10.00",
   "ALTER TABLE expenses ADD COLUMN created_by VARCHAR(255) DEFAULT NULL",
-  "ALTER TABLE expenses ADD COLUMN created_by_id VARCHAR(50) DEFAULT NULL"
+  "ALTER TABLE expenses ADD COLUMN created_by_id VARCHAR(50) DEFAULT NULL",
+  "ALTER TABLE members ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  "ALTER TABLE employees ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  "ALTER TABLE plans ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  "ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  "ALTER TABLE payments ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  "ALTER TABLE attendance ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
 ];
 
 async function _initSchema(pool) {
@@ -245,4 +251,8 @@ function setStatusCallback(cb) {
   if (smartPool) smartPool.onEvent(cb);
 }
 
-module.exports = { pool, initializeDatabase, setStatusCallback };
+function getSmartPool() {
+  return smartPool;
+}
+
+module.exports = { pool, initializeDatabase, setStatusCallback, getSmartPool };

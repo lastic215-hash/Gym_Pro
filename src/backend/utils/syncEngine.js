@@ -58,7 +58,7 @@ class SyncEngine {
 
     try {
       const [rows] = await this.smartPool.localPool.execute(
-        'SELECT id, sql_text, params_json FROM __sync_queue ORDER BY id ASC LIMIT 50'
+        'SELECT id, table_name, operation, sql_text, params_json FROM __sync_queue ORDER BY id ASC LIMIT 50'
       );
 
       if (rows.length === 0) {
@@ -72,24 +72,32 @@ class SyncEngine {
       for (const row of rows) {
         let retries = 0;
         let success = false;
-        console.log(`[SyncEngine] ▶ Executing: ${row.operation} on ${row.table_name}: ${(row.sql_text || '').substring(0, 100)}`);
+        const op = (row.operation || '').toUpperCase();
+        const tbl = row.table_name || '?';
+        console.log(`[SyncEngine] ▶ ${op} on ${tbl} (#${row.id}): ${(row.sql_text || '').substring(0, 100)}`);
         while (retries < MAX_RETRY && !success) {
           try {
             const params = row.params_json ? JSON.parse(row.params_json) : [];
             const finalParams = params.length > 0 ? params : undefined;
-            await this.smartPool.cloudPool.execute(row.sql_text, finalParams);
+            const [result] = await this.smartPool.cloudPool.execute(row.sql_text, finalParams);
+
+            if ((op === 'UPDATE' || op === 'DELETE') && result.affectedRows === 0) {
+              console.log(`[SyncEngine] ⏳ ${op} on ${tbl} (#${row.id}): 0 rows affected, keeping in queue for next cycle`);
+              break;
+            }
+
             await this.smartPool.localPool.execute('DELETE FROM __sync_queue WHERE id = ?', [row.id]);
-            console.log(`[SyncEngine] ✅ OK: ${row.operation} on ${row.table_name} (#${row.id})`);
+            console.log(`[SyncEngine] ✅ ${op} on ${tbl} (#${row.id})`);
             synced++;
             success = true;
           } catch (e) {
             retries++;
             if (retries >= MAX_RETRY) {
-              console.error(`[SyncEngine] ❌ Failed ${row.operation} on ${row.table_name} (#${row.id}) after ${MAX_RETRY} retries:`, e.message.substring(0, 200));
+              console.error(`[SyncEngine] ❌ ${op} on ${tbl} (#${row.id}) after ${MAX_RETRY} retries:`, e.message.substring(0, 200));
               await this.smartPool.localPool.execute('DELETE FROM __sync_queue WHERE id = ?', [row.id]);
               failed++;
             } else {
-              console.warn(`[SyncEngine] ⚠ Retry ${retries}/${MAX_RETRY} for ${row.operation} on ${row.table_name} (#${row.id}):`, e.message.substring(0, 100));
+              console.warn(`[SyncEngine] ⚠ Retry ${retries}/${MAX_RETRY} for ${op} on ${tbl} (#${row.id}):`, e.message.substring(0, 100));
               await new Promise(r => setTimeout(r, 1000 * retries));
             }
           }
