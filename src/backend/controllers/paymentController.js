@@ -58,7 +58,7 @@ async function processPayment(req, res) {
     return res.status(200).json({
       success: true,
       message: "تمت عملية الدفع وتفعيل الاشتراك بنجاح",
-      payment: { member_id, plan_name: plan.name, amount, method, payment_date, expiry_date }
+      payment: { member_id, member_name: member.name, plan_name: plan.name, duration_days: plan.duration_days, amount, method, payment_date, expiry_date }
     });
   } catch (error) {
     console.error('processPayment error:', error);

@@ -30,7 +30,14 @@ router.get('/employee/members/by-plan', getMembersByPlan);
 router.get('/employee/trainers', async (req, res) => {
   try {
     const { pool } = require('../config/database');
-    const [rows] = await pool.execute("SELECT id, name, role, specialization FROM employees WHERE id != 'ADMIN' AND (role LIKE '%مدرب%' OR role LIKE '%Trainer%' OR role LIKE '%كابتن%')");
+    let rows;
+    try {
+      const [result] = await pool.execute("SELECT id, name, role, specialization FROM employees WHERE id != 'ADMIN' AND (role LIKE '%مدرب%' OR role LIKE '%Trainer%' OR role LIKE '%كابتن%')");
+      rows = result;
+    } catch (_) {
+      const [result] = await pool.execute("SELECT id, name, role FROM employees WHERE id != 'ADMIN' AND (role LIKE '%مدرب%' OR role LIKE '%Trainer%' OR role LIKE '%كابتن%')");
+      rows = result.map(r => ({ ...r, specialization: null }));
+    }
     res.json({ success: true, trainers: rows });
   } catch (_) { res.status(500).json({ success: false, trainers: [] }); }
 });

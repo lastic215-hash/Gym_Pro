@@ -512,6 +512,8 @@ async function registerAndPay(req, res) {
       message: "تم تسجيل العضو بنجاح" + (paymentRecorded ? " وتسجيل الدفع" : ""),
       member: {
         id: newId, name, phone, plan_id,
+        plan_name: plan.name,
+        duration_days: plan.duration_days,
         trainer_id: trainer_id || null,
         registration_date, expiry_date,
         status: 'active', fee_paid: plan.price
