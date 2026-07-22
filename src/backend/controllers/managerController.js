@@ -36,7 +36,7 @@ async function getPeakHours(req, res) {
 async function getRevenueSpread(req, res) {
   try {
     const [rows] = await pool.execute(
-      "SELECT COALESCE(p.name, 'غير محدد') as sub_type, COALESCE(SUM(m.fee_paid),0) as total FROM members m LEFT JOIN plans p ON m.plan_id = p.id GROUP BY m.plan_id"
+      "SELECT COALESCE(p.name, 'غير محدد') as sub_type, COALESCE(SUM(m.fee_paid),0) as total FROM members m LEFT JOIN plans p ON m.plan_id = p.id WHERE MONTH(m.registration_date) = MONTH(CURDATE()) AND YEAR(m.registration_date) = YEAR(CURDATE()) GROUP BY m.plan_id"
     );
     return res.status(200).json({ success: true, revenue_spread: rows });
   } catch (error) {

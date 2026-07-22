@@ -22,7 +22,7 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/shift', shiftsRouter);
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
-const { cleanupOldAttendance } = require('./controllers/memberController');
+const { cleanupOldAttendance, syncExpiredMembersStatus } = require('./controllers/memberController');
 const { SyncEngine } = require('./utils/syncEngine');
 
 let syncEngine = null;
@@ -57,6 +57,10 @@ async function start() {
     // Run attendance cleanup every hour
     cleanupOldAttendance();
     setInterval(cleanupOldAttendance, 60 * 60 * 1000);
+
+    // Sync expired members status every hour
+    syncExpiredMembersStatus();
+    setInterval(syncExpiredMembersStatus, 60 * 60 * 1000);
   } catch (error) {
     console.error('Failed to start server:', error.message);
     process.exit(1);

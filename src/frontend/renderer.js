@@ -919,6 +919,13 @@
   const regPlanId = document.getElementById('reg-plan-id');
   const regResult = document.getElementById('reg-result');
 
+  const PLAN_SPEC_MAP = {
+    1: 'Weightlifting',
+    2: 'Calisthenics',
+    3: 'MMA',
+    4: 'General'
+  };
+
   async function loadPlansDropdown() {
     if (!regPlanId) return;
     try {
@@ -930,6 +937,7 @@
           const opt = document.createElement('option');
           opt.value = p.id;
           opt.setAttribute('data-price', p.price);
+          opt.setAttribute('data-spec', PLAN_SPEC_MAP[p.id] || 'General');
           opt.textContent = parseFloat(p.price).toFixed(2) + ' د.ل ' + ' - ' + p.name;
           regPlanId.appendChild(opt);
         });
@@ -954,14 +962,15 @@
 
     function updatePaymentSection() {
       const val = regPlanId.value;
-      if (!val) { regPaymentSection.classList.add('hidden'); return; }
+      if (!val) { regPaymentSection.classList.add('hidden'); filterTrainersBySpec(''); return; }
       const opt = regPlanId.querySelector('option[value="' + val + '"]');
-      if (!opt) { regPaymentSection.classList.add('hidden'); return; }
+      if (!opt) { regPaymentSection.classList.add('hidden'); filterTrainersBySpec(''); return; }
       const price = opt.getAttribute('data-price');
       regPlanPrice.textContent = parseFloat(price).toFixed(2) + ' د.ل';
       regAmountReceived.value = price;
       regPaymentSection.classList.remove('hidden');
       calcChange();
+      filterTrainersBySpec(opt.getAttribute('data-spec'));
     }
 
     function calcChange() {
@@ -1049,6 +1058,8 @@
           regPaymentSection.classList.add('hidden');
           document.querySelector('input[name="reg-payment-method"][value="cash"]').checked = true;
           regCashFields.classList.remove('hidden');
+
+          showReceiptFromRegistration(data);
         } else {
           if (regResult) {
             regResult.className = 'mt-4 p-3 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-200 text-sm';
@@ -1327,7 +1338,7 @@
             card.className = 'bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 flex items-center justify-between';
             card.innerHTML =
               '<div class="flex items-center gap-2.5"><span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span><div><div class="text-sm text-slate-100">' + m.name + '</div><div class="text-[11px] text-slate-500">' + m.id + ' · ' + (m.plan_name || 'بدون باقة') + ' · حتى ' + fmtDate(m.expiry_date) + '</div></div></div>' +
-              '<div class="flex items-center gap-1.5"><span class="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">نشط</span><button class="edit-member-btn text-amber-400 hover:text-amber-300 text-xs px-1.5 py-0.5 rounded transition-colors" data-id="' + m.id + '" data-phone="' + (m.phone || '') + '" data-plan="' + (m.plan_id || '') + '" data-trainer="' + (m.trainer_id || '') + '" title="تعديل">تعديل</button><button class="delete-member-btn text-rose-500 hover:text-rose-400 text-xs px-1.5 py-0.5 rounded transition-colors" data-id="' + m.id + '" data-name="' + m.name.replace(/"/g, '&quot;') + '" title="حذف">✕</button></div>';
+              '<div class="flex items-center gap-1.5"><span class="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">نشط</span><button class="print-card-btn text-cyan-400 hover:text-cyan-300 text-xs px-1.5 py-0.5 rounded transition-colors" data-id="' + m.id + '" data-name="' + m.name.replace(/"/g, '&quot;') + '" data-phone="' + (m.phone || '') + '" data-plan="' + (m.plan_name || '') + '" data-expiry="' + fmtDate(m.expiry_date) + '" title="طباعة البطاقة">بطاقة</button><button class="edit-member-btn text-amber-400 hover:text-amber-300 text-xs px-1.5 py-0.5 rounded transition-colors" data-id="' + m.id + '" data-phone="' + (m.phone || '') + '" data-plan="' + (m.plan_id || '') + '" data-trainer="' + (m.trainer_id || '') + '" title="تعديل">تعديل</button><button class="delete-member-btn text-rose-500 hover:text-rose-400 text-xs px-1.5 py-0.5 rounded transition-colors" data-id="' + m.id + '" data-name="' + m.name.replace(/"/g, '&quot;') + '" title="حذف">✕</button></div>';
             activeMembersDiv.appendChild(card);
           });
         }
@@ -2140,6 +2151,8 @@
   // ================================================================
   //  Load trainers dropdown for member registration
   // ================================================================
+  let allTrainers = [];
+
   async function loadTrainersDropdown() {
     const select = document.getElementById('reg-trainer-id');
     if (!select) return;
@@ -2147,6 +2160,7 @@
       const res = await fetch(API_BASE + '/employee/trainers');
       const data = await res.json();
       if (data.success && data.trainers && data.trainers.length > 0) {
+        allTrainers = data.trainers;
         select.innerHTML = '<option value="">-- بدون مدرب --</option>';
         data.trainers.forEach(e => {
           const opt = document.createElement('option');
@@ -2157,6 +2171,20 @@
         });
       }
     } catch (_) {}
+  }
+
+  function filterTrainersBySpec(spec) {
+    const select = document.getElementById('reg-trainer-id');
+    if (!select) return;
+    select.innerHTML = '<option value="">-- بدون مدرب --</option>';
+    const filtered = spec ? allTrainers.filter(t => (t.specialization || 'General') === spec) : allTrainers;
+    filtered.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      const s = e.specialization ? ' [' + e.specialization + ']' : '';
+      opt.textContent = e.name + s + ' (' + e.id + ')';
+      select.appendChild(opt);
+    });
   }
 
   function resetStaffForm() {
@@ -2640,6 +2668,7 @@
             paymentSuccessAnim.classList.remove('hidden');
             setTimeout(() => paymentSuccessAnim.classList.add('hidden'), 1500);
           }
+          showReceiptFromPayment(data);
           setTimeout(() => {
             closePaymentModal();
             loadMembersLists();
@@ -2667,4 +2696,329 @@
       }
     });
   }
+
+  // ================================================================
+  //  RECEIPT & CARD & REPORT PRINTING
+  // ================================================================
+  const GYM_NAME = 'GYMPRO';
+  const GYM_SUBTITLE = 'نظام إدارة النادي الرياضي';
+
+  const PRINT_STYLES = '<style>' +
+    '@import url("vendor/fonts.css");' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:"Tajawal",sans-serif;color:#1a1a1a;background:#fff;padding:0}' +
+    '@media print{body{padding:0} @page{margin:15mm}}' +
+    '.card-area,.receipt-area{print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
+    '.receipt-area{width:100%;max-width:750px;margin:40px auto;padding:50px 60px;border:2px solid #e2e8f0;border-radius:16px;min-height:calc(100vh - 80px)}' +
+    '.receipt-area .hdr{text-align:center;border-bottom:3px solid #10b981;padding-bottom:20px;margin-bottom:30px}' +
+    '.receipt-area .hdr h2{font-size:36px;font-weight:800;color:#10b981;font-family:"Orbitron",sans-serif;letter-spacing:3px}' +
+    '.receipt-area .hdr p{font-size:16px;color:#64748b;margin-top:6px}' +
+    '.receipt-area .row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px dashed #e2e8f0;font-size:20px}' +
+    '.receipt-area .row .lbl{color:#64748b}.receipt-area .row .val{color:#1e293b;font-weight:700}' +
+    '.receipt-area .total{text-align:center;font-size:30px;font-weight:800;color:#10b981;padding:20px 0;margin-top:16px;border-top:3px solid #10b981}' +
+    '.receipt-area .ftr{text-align:center;font-size:14px;color:#94a3b8;margin-top:30px;padding-top:16px;border-top:1px solid #e2e8f0}' +
+    '.card-area{width:340px;height:270px;border-radius:14px;padding:20px;position:relative;overflow:hidden;color:#fff;' +
+    'background:linear-gradient(135deg,#064e3b 0%,#0f172a 50%,#064e3b 100%);border:1px solid rgba(16,185,129,0.4);' +
+    'box-shadow:0 8px 32px rgba(16,185,129,0.3)}' +
+    '.card-area .gym{font-family:"Orbitron",sans-serif;font-size:14px;font-weight:700;color:#34d399;letter-spacing:2px}' +
+    '.card-area .sub{font-size:10px;color:rgba(148,163,184,0.8);margin-bottom:10px}' +
+    '.card-area .div{height:1px;background:linear-gradient(90deg,transparent,rgba(16,185,129,0.5),transparent);margin:8px 0}' +
+    '.card-area .lbl{font-size:10px;color:rgba(148,163,184,0.7)}' +
+    '.card-area .cname{font-size:17px;font-weight:700;color:#fff}' +
+    '.card-area .cid{font-size:11px;color:#34d399;font-family:"Orbitron",sans-serif}' +
+    '.card-area .val{font-size:13px;font-weight:600;color:#e2e8f0}' +
+    '.card-area .badge{background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#34d399;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;display:inline-block}' +
+    '.card-area .rw{display:flex;justify-content:space-between;align-items:center;padding:3px 0}' +
+    '.rpt{max-width:800px;margin:20px auto;padding:32px;color:#1a1a1a}' +
+    '.rpt .hdr{text-align:center;border-bottom:3px solid #10b981;padding-bottom:16px;margin-bottom:24px}' +
+    '.rpt .hdr h1{font-size:22px;font-weight:800;color:#10b981;font-family:"Orbitron",sans-serif}' +
+    '.rpt .hdr .dt{font-size:12px;color:#64748b;margin-top:4px}' +
+    '.rpt .sec{margin-bottom:24px}' +
+    '.rpt .sec h2{font-size:15px;font-weight:700;color:#10b981;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-bottom:12px}' +
+    '.rpt .kg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}' +
+    '.rpt .kc{text-align:center;padding:16px;border:1px solid #e2e8f0;border-radius:8px}' +
+    '.rpt .kc .kl{font-size:12px;color:#64748b}.rpt .kc .kv{font-size:24px;font-weight:700;margin-top:4px}' +
+    '.rpt .kc.grn .kv{color:#10b981}.rpt .kc.red .kv{color:#ef4444}.rpt .kc.blu .kv{color:#3b82f6}' +
+    '.rpt table{width:100%;border-collapse:collapse;font-size:12px}' +
+    '.rpt table th{background:#f1f5f9;padding:8px 12px;text-align:right;font-weight:600;color:#475569;border-bottom:2px solid #e2e8f0}' +
+    '.rpt table td{padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#334155}' +
+    '.rpt .ftr{text-align:center;font-size:11px;color:#94a3b8;margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0}' +
+    '</style>';
+
+  function openPrintWindow(html, title) {
+    const win = window.open('', '_blank', 'width=900,height=800');
+    if (!win) { alert('يرجى السماح بفتح النوافذ المنبثقة'); return; }
+    win.document.write('<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>' + title + '</title>');
+    win.document.write(PRINT_STYLES);
+    win.document.write('</head><body>' + html + '</body></html>');
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+  }
+
+  // --- Receipt Modal ---
+  const receiptModal = document.getElementById('receipt-modal');
+  const receiptContent = document.getElementById('receipt-content');
+  const receiptCloseBtn = document.getElementById('receipt-close-btn');
+  const receiptPrintBtn = document.getElementById('receipt-print-btn');
+  const receiptPdfBtn = document.getElementById('receipt-pdf-btn');
+  const receiptCardBtn = document.getElementById('receipt-card-btn');
+
+  let lastReceiptData = null;
+
+  function buildReceiptHTML(d) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ar-LY') + ' — ' + now.toLocaleTimeString('ar-LY', {hour:'2-digit', minute:'2-digit'});
+    let html = '<div class="receipt-area">' +
+      '<div class="hdr"><h2>' + GYM_NAME + '</h2><p>' + GYM_SUBTITLE + '</p></div>' +
+      '<div class="row"><span class="lbl">رقم العضوية</span><span class="val">' + (d.member_id || '') + '</span></div>' +
+      '<div class="row"><span class="lbl">اسم العضو</span><span class="val">' + (d.member_name || '') + '</span></div>' +
+      '<div class="row"><span class="lbl">رقم الهاتف</span><span class="val">' + (d.phone || '—') + '</span></div>' +
+      '<div class="row"><span class="lbl">الباقة</span><span class="val">' + (d.plan_name || '') + '</span></div>' +
+      '<div class="row"><span class="lbl">المدة</span><span class="val">' + (d.duration || '') + ' يوم</span></div>' +
+      '<div class="row"><span class="lbl">تاريخ التسجيل</span><span class="val">' + (d.registration_date || '') + '</span></div>' +
+      '<div class="row"><span class="lbl">تاريخ الانتهاء</span><span class="val">' + (d.expiry_date || '') + '</span></div>' +
+      '<div class="row"><span class="lbl">طريقة الدفع</span><span class="val">' + (d.payment_method === 'card' ? 'بطاقة' : 'نقداً') + '</span></div>' +
+      '<div class="total">' + (d.amount || 0).toFixed(2) + ' د.ل</div>';
+    if (d.change > 0) {
+      html += '<div class="row"><span class="lbl">المبلغ المستلم</span><span class="val">' + (d.amount_received || 0).toFixed(2) + ' د.ل</span></div>' +
+        '<div class="row"><span class="lbl">الباقي</span><span class="val" style="color:#f59e0b">' + d.change.toFixed(2) + ' د.ل</span></div>';
+    }
+    html += '<div class="ftr">' + dateStr + '</div></div>';
+    return html;
+  }
+
+  function showReceipt(data) {
+    lastReceiptData = data;
+    if (!receiptContent) return;
+    receiptContent.innerHTML = buildReceiptHTML(data);
+    if (receiptModal) receiptModal.classList.remove('hidden');
+  }
+
+  function showReceiptFromRegistration(data) {
+    showReceipt({
+      member_id: data.member.id,
+      member_name: data.member.name,
+      phone: data.member.phone,
+      plan_name: data.member.plan_name || '',
+      duration: data.member.duration_days || '',
+      registration_date: data.member.registration_date,
+      expiry_date: data.member.expiry_date,
+      payment_method: data.payment ? data.payment.method : 'cash',
+      amount: data.payment ? data.payment.amount : data.member.fee_paid,
+      amount_received: data.payment ? data.payment.amount : 0,
+      change: data.payment ? (data.payment.change || 0) : 0
+    });
+  }
+
+  function showReceiptFromPayment(data) {
+    showReceipt({
+      member_id: data.payment.member_id,
+      member_name: data.payment.member_name || '',
+      phone: '',
+      plan_name: data.payment.plan_name || '',
+      duration: data.payment.duration_days || '',
+      registration_date: data.payment.payment_date,
+      expiry_date: data.payment.expiry_date,
+      payment_method: data.payment.method,
+      amount: data.payment.amount,
+      amount_received: data.payment.amount,
+      change: 0
+    });
+  }
+
+  if (receiptCloseBtn) receiptCloseBtn.addEventListener('click', () => receiptModal.classList.add('hidden'));
+  if (receiptModal) receiptModal.addEventListener('click', (e) => { if (e.target === receiptModal) receiptModal.classList.add('hidden'); });
+
+  function handleReceiptPrint() {
+    if (!lastReceiptData) return;
+    openPrintWindow(buildReceiptHTML(lastReceiptData), 'إيصال الاشتراك — ' + GYM_NAME);
+  }
+  if (receiptPrintBtn) receiptPrintBtn.addEventListener('click', handleReceiptPrint);
+  if (receiptPdfBtn) receiptPdfBtn.addEventListener('click', handleReceiptPrint);
+
+  if (receiptCardBtn) {
+    receiptCardBtn.addEventListener('click', () => {
+      if (lastReceiptData) {
+        showCard({
+          member_id: lastReceiptData.member_id,
+          member_name: lastReceiptData.member_name,
+          plan_name: lastReceiptData.plan_name,
+          expiry_date: lastReceiptData.expiry_date
+        });
+      }
+    });
+  }
+
+  // --- Card Modal ---
+  const cardModal = document.getElementById('card-modal');
+  const cardContent = document.getElementById('card-content');
+  const cardCloseBtn = document.getElementById('card-close-btn');
+  const cardPrintBtn = document.getElementById('card-print-btn');
+  const cardPdfBtn = document.getElementById('card-pdf-btn');
+
+  let lastCardData = null;
+
+  function buildCardHTML(d) {
+    return '<div class="card-area">' +
+      '<div class="gym">' + GYM_NAME + '</div>' +
+      '<div class="sub">بطاقة العضوية — عضو نشط</div>' +
+      '<div class="div"></div>' +
+      '<div class="rw"><div><div class="lbl">اسم العضو</div><div class="cname">' + (d.member_name || '') + '</div></div></div>' +
+      '<div class="rw" style="margin-top:6px"><div><div class="lbl">رقم العضوية</div><div class="cid">' + (d.member_id || '') + '</div></div></div>' +
+      '<div class="div"></div>' +
+      '<div class="rw"><div><div class="lbl">الباقة</div><span class="badge">' + (d.plan_name || '') + '</span></div>' +
+      '<div style="text-align:left"><div class="lbl">تاريخ الانتهاء</div><div class="val">' + (d.expiry_date || '') + '</div></div></div>' +
+      '</div>';
+  }
+
+  function showCard(data) {
+    lastCardData = data;
+    if (!cardContent) return;
+    cardContent.innerHTML = buildCardHTML(data);
+    if (cardModal) cardModal.classList.remove('hidden');
+  }
+
+  function showCardFromRegistration(data) {
+    showCard({
+      member_id: data.member.id,
+      member_name: data.member.name,
+      plan_name: data.member.plan_name || '',
+      expiry_date: data.member.expiry_date
+    });
+  }
+
+  if (cardCloseBtn) cardCloseBtn.addEventListener('click', () => cardModal.classList.add('hidden'));
+  if (cardModal) cardModal.addEventListener('click', (e) => { if (e.target === cardModal) cardModal.classList.add('hidden'); });
+
+  function handleCardPrint() {
+    if (!lastCardData) return;
+    openPrintWindow(buildCardHTML(lastCardData), 'بطاقة العضوية — ' + GYM_NAME);
+  }
+  if (cardPrintBtn) cardPrintBtn.addEventListener('click', handleCardPrint);
+  if (cardPdfBtn) cardPdfBtn.addEventListener('click', handleCardPrint);
+
+  // --- Print card from members list ---
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.print-card-btn');
+    if (!btn) return;
+    showCard({
+      member_id: btn.getAttribute('data-id'),
+      member_name: btn.getAttribute('data-name'),
+      plan_name: btn.getAttribute('data-plan'),
+      expiry_date: btn.getAttribute('data-expiry')
+    });
+  });
+
+  // --- Financial Report Modal ---
+  const reportModal = document.getElementById('report-modal');
+  const reportContent = document.getElementById('report-content');
+  const reportCloseBtn = document.getElementById('report-close-btn');
+  const reportPrintBtn = document.getElementById('report-print-btn');
+  const reportPdfBtn = document.getElementById('report-pdf-btn');
+  const openReportBtn = document.getElementById('open-report-btn');
+
+  if (reportCloseBtn) reportCloseBtn.addEventListener('click', () => reportModal.classList.add('hidden'));
+  if (reportModal) reportModal.addEventListener('click', (e) => { if (e.target === reportModal) reportModal.classList.add('hidden'); });
+
+  let lastReportHTML = '';
+
+  async function generateFinancialReport() {
+    if (!reportContent) return;
+    reportContent.innerHTML = '<p class="text-slate-500 text-center py-8">جاري تحميل البيانات...</p>';
+    reportModal.classList.remove('hidden');
+
+    try {
+      const [intelRes, expensesRes, statsRes, revenueRes] = await Promise.all([
+        apiFetch(API_BASE + '/manager/financial-intelligence'),
+        apiFetch(API_BASE + '/manager/expenses'),
+        apiFetch(API_BASE + '/manager/dashboard-stats'),
+        apiFetch(API_BASE + '/manager/analytics/revenue-spread')
+      ]);
+      const intel = await intelRes.json();
+      const expenses = await expensesRes.json();
+      const stats = await statsRes.json();
+      const revenue = await revenueRes.json();
+
+      const totalRevenue = intel.success ? parseFloat(intel.total_revenue) : 0;
+      const totalExpenses = intel.success ? parseFloat(intel.total_expenses) : 0;
+      const netProfit = totalRevenue - totalExpenses;
+      const activeCount = stats.success ? stats.active_count : 0;
+      const expiredCount = stats.success ? stats.expired_count : 0;
+      const monthlyIncome = stats.success ? parseFloat(stats.monthly_income) : 0;
+
+      const categoryLabels = { Rent: 'إيجار', Utilities: 'مرافق', Salaries: 'رواتب', Marketing: 'تسويق', Equipment: 'معدات', Other: 'أخرى' };
+      const expensesList = expenses.success ? expenses.expenses : [];
+
+      let expensesByCategory = {};
+      expensesList.forEach(e => {
+        const cat = categoryLabels[e.category] || e.category;
+        expensesByCategory[cat] = (expensesByCategory[cat] || 0) + parseFloat(e.amount);
+      });
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ar-LY');
+      const monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      const monthYear = monthNames[now.getMonth()] + ' ' + now.getFullYear();
+
+      let categoryRows = '';
+      Object.keys(expensesByCategory).forEach(cat => {
+        categoryRows += '<tr><td>' + cat + '</td><td>' + expensesByCategory[cat].toFixed(2) + ' د.ل</td></tr>';
+      });
+
+      let expenseRows = '';
+      expensesList.slice(0, 20).forEach((e, i) => {
+        expenseRows += '<tr><td>' + (i+1) + '</td><td>' + e.description + '</td><td>' + (categoryLabels[e.category] || e.category) + '</td><td>' + parseFloat(e.amount).toFixed(2) + '</td><td>' + (e.expense_date || '—') + '</td></tr>';
+      });
+
+      let revenueRows = '';
+      if (revenue.success && revenue.revenue_spread) {
+        revenue.revenue_spread.forEach(r => {
+          revenueRows += '<tr><td>' + r.sub_type + '</td><td>' + parseFloat(r.total).toFixed(2) + ' د.ل</td></tr>';
+        });
+      }
+
+      let profitClass = netProfit >= 0 ? 'grn' : 'red';
+
+      lastReportHTML = '<div class="rpt">' +
+        '<div class="hdr"><h1>' + GYM_NAME + '</h1>' +
+        '<div class="dt">التقرير المالي الشامل — ' + monthYear + '</div>' +
+        '<div class="dt">تاريخ التقرير: ' + dateStr + '</div></div>' +
+
+        '<div class="sec"><h2>ملخص الأداء المالي</h2>' +
+        '<div class="kg">' +
+        '<div class="kc grn"><div class="kl">إجمالي الإيرادات</div><div class="kv">' + totalRevenue.toFixed(2) + '</div><div class="kl">دينار ليبي</div></div>' +
+        '<div class="kc red"><div class="kl">إجمالي المصروفات</div><div class="kv">' + totalExpenses.toFixed(2) + '</div><div class="kl">دينار ليبي</div></div>' +
+        '<div class="kc ' + profitClass + '"><div class="kl">صافي الأرباح</div><div class="kv">' + netProfit.toFixed(2) + '</div><div class="kl">دينار ليبي</div></div>' +
+        '</div></div>' +
+
+        '<div class="sec"><h2>إحصائيات الأعضاء</h2>' +
+        '<div class="kg">' +
+        '<div class="kc blu"><div class="kl">الأعضاء النشطون</div><div class="kv">' + activeCount + '</div></div>' +
+        '<div class="kc red"><div class="kl">الاشتراكات المنتهية</div><div class="kv">' + expiredCount + '</div></div>' +
+        '<div class="kc grn"><div class="kl">الدخل الشهري</div><div class="kv">' + monthlyIncome.toFixed(2) + '</div><div class="kl">د.ل</div></div>' +
+        '</div></div>' +
+
+        (revenueRows ? '<div class="sec"><h2>الإيرادات حسب النشاط</h2><table><thead><tr><th>النشاط</th><th>المبلغ</th></tr></thead><tbody>' + revenueRows + '</tbody></table></div>' : '') +
+        (categoryRows ? '<div class="sec"><h2>المصروفات حسب الفئة</h2><table><thead><tr><th>الفئة</th><th>المبلغ</th></tr></thead><tbody>' + categoryRows + '</tbody></table></div>' : '') +
+        (expenseRows ? '<div class="sec"><h2>آخر المصروفات المسجلة</h2><table><thead><tr><th>#</th><th>الوصف</th><th>الفئة</th><th>المبلغ</th><th>التاريخ</th></tr></thead><tbody>' + expenseRows + '</tbody></table></div>' : '') +
+
+        '<div class="ftr">تم إعداد هذا التقرير تلقائياً بواسطة ' + GYM_NAME + ' — ' + dateStr + '</div></div>';
+
+      reportContent.innerHTML = lastReportHTML;
+
+    } catch (_) {
+      reportContent.innerHTML = '<p class="text-rose-400 text-center py-8">تعذر تحميل بيانات التقرير</p>';
+    }
+  }
+
+  if (openReportBtn) openReportBtn.addEventListener('click', generateFinancialReport);
+
+  function handleReportPrint() {
+    if (!lastReportHTML) { alert('قم بتوليد التقرير أولاً'); return; }
+    openPrintWindow(lastReportHTML, 'التقرير المالي — ' + GYM_NAME);
+  }
+  if (reportPrintBtn) reportPrintBtn.addEventListener('click', handleReportPrint);
+  if (reportPdfBtn) reportPdfBtn.addEventListener('click', handleReportPrint);
+
 });

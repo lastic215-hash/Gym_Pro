@@ -130,7 +130,7 @@ async function registerMember(req, res) {
 
 async function renewMember(req, res) {
   try {
-    const { id } = req.body;
+    const { id, amount, method } = req.body;
 
     if (!id) {
       return res.status(400).json({ success: false, message: "رقم العضو مطلوب" });
@@ -142,10 +142,13 @@ async function renewMember(req, res) {
     }
 
     let durationDays = 30;
-    if (memberRows[0].plan_id) {
-      const [planRows] = await pool.execute('SELECT duration_days FROM plans WHERE id = ?', [memberRows[0].plan_id]);
+    let planPrice = 0;
+    const planId = memberRows[0].plan_id;
+    if (planId) {
+      const [planRows] = await pool.execute('SELECT duration_days, price FROM plans WHERE id = ?', [planId]);
       if (planRows.length > 0) {
         durationDays = planRows[0].duration_days;
+        planPrice = planRows[0].price;
       }
     }
 
@@ -154,13 +157,29 @@ async function renewMember(req, res) {
     expiry.setDate(expiry.getDate() + durationDays);
     const expiry_date = expiry.toISOString().split('T')[0];
 
-    const [result] = await pool.execute(
-      `UPDATE members SET status = ?, registration_date = ?, expiry_date = ? WHERE id = ?`,
-      ['active', today, expiry_date, id]
-    );
+    const paidAmount = amount || planPrice;
+    const payMethod = method || 'cash';
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "لم يتم العثور على العضو" });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      await conn.execute(
+        `UPDATE members SET status = ?, registration_date = ?, expiry_date = ?, fee_paid = ? WHERE id = ?`,
+        ['active', today, expiry_date, paidAmount, id]
+      );
+
+      await conn.execute(
+        'INSERT INTO payments (member_id, plan_id, amount, method, payment_date) VALUES (?, ?, ?, ?, ?)',
+        [id, planId, paidAmount, payMethod, today]
+      );
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
 
     const role = req.headers['x-user-role'] || 'employee';
@@ -170,7 +189,8 @@ async function renewMember(req, res) {
     return res.status(200).json({
       success: true,
       message: "تم تجديد الاشتراك بنجاح",
-      member: { id, expiry_date, registration_date: today, status: 'active' }
+      member: { id, expiry_date, registration_date: today, status: 'active' },
+      payment: { member_id: id, plan_id: planId, amount: paidAmount, method: payMethod, payment_date: today }
     });
   } catch (error) {
     console.error('renewMember error:', error);
@@ -236,6 +256,8 @@ async function markAttendance(req, res) {
 
 async function getMembersList(req, res) {
   try {
+    await syncExpiredMembersStatus();
+
     const [activeMembers] = await pool.execute(
       "SELECT m.*, p.name as plan_name, e.name as trainer_name FROM members m LEFT JOIN plans p ON m.plan_id = p.id LEFT JOIN employees e ON m.trainer_id = e.id WHERE m.status = 'active' ORDER BY m.name"
     );
@@ -396,6 +418,23 @@ async function cleanupOldAttendance() {
   }
 }
 
+async function syncExpiredMembersStatus() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [result] = await pool.execute(
+      "UPDATE members SET status = 'expired' WHERE expiry_date < ? AND status = 'active'",
+      [today]
+    );
+    if (result.affectedRows > 0) {
+      console.log(`[sync] Marked ${result.affectedRows} member(s) as expired`);
+    }
+    return result.affectedRows;
+  } catch (error) {
+    console.error('[sync] Error syncing expired members:', error.message);
+    return 0;
+  }
+}
+
 async function getRecentAttendance(req, res) {
   try {
     const limit = 5;
@@ -549,5 +588,6 @@ module.exports = {
   registerAndPay,
   getTrainerAttendanceToday,
   getMemberAttendanceHistory,
-  cleanupOldAttendance
+  cleanupOldAttendance,
+  syncExpiredMembersStatus
 };
